@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cierre de Caja</string>
+    <string name="title_activity_main">Cierre de Caja</string>
+    <string name="package_name">co.cierredecaja.app</string>
+    <string name="custom_url_scheme">co.cierredecaja.app</string>
+</resources>

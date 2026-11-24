@@ -1,0 +1,8 @@
+# Cada proyecto (app/, api/) tiene además su propio .gitignore
+.DS_Store
+Thumbs.db
+
+# ocr/
+ocr/.venv/
+__pycache__/
+*.pyc

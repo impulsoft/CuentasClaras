@@ -1,0 +1,90 @@
+apply plugin: 'com.android.application'
+
+// Llave para firmar la APK de los dueños. Vive FUERA del proyecto (no va a OneDrive ni a git):
+// por defecto en C:\Users\<usuario>\LlaveCierreDeCaja\firma.properties, o donde diga la
+// variable de entorno CIERRE_FIRMA. Se crea una sola vez con app/scripts/crear-llave.ps1.
+def archivoFirma = file(System.getenv('CIERRE_FIRMA') ?: "${System.getProperty('user.home')}/LlaveCierreDeCaja/firma.properties")
+def firma = new Properties()
+if (archivoFirma.exists()) {
+    archivoFirma.withReader('UTF-8') { firma.load(it) }
+}
+
+android {
+    namespace = "co.cierredecaja.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "co.cierredecaja.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (archivoFirma.exists()) {
+            release {
+                storeFile file(firma.getProperty('storeFile'))
+                storePassword firma.getProperty('storePassword')
+                keyAlias firma.getProperty('keyAlias')
+                keyPassword firma.getProperty('keyPassword')
+            }
+        }
+    }
+    buildTypes {
+        // APK de prueba: puede hablar con la API de desarrollo por http (la del PC)
+        debug {
+            manifestPlaceholders = [usaHttp: "true"]
+        }
+        // APK para los dueños: solo https, firmada con la llave
+        release {
+            if (archivoFirma.exists()) {
+                signingConfig signingConfigs.release
+            }
+            manifestPlaceholders = [usaHttp: "false"]
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+// Sin la llave no se arma una APK de los dueños sin firmar (Android no la deja instalar)
+gradle.taskGraph.whenReady { grafo ->
+    if (!archivoFirma.exists() && grafo.allTasks.any { it.name.contains('Release') }) {
+        throw new GradleException("No se encontró la llave para firmar: ${archivoFirma}\n" +
+            "Créela una sola vez con app/scripts/crear-llave.ps1 (ver README, «Llave para firmar la APK»).")
+    }
+}
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

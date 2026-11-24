@@ -1,0 +1,440 @@
+/*
+ * Sistema de diseño de Cierre de Caja: verde esmeralda, cercano y claro.
+ * Pensado para personas sin experiencia: letras grandes, botones grandes y mensajes amables (RNF-05).
+ */
+:root {
+  /* Verde esmeralda (color principal) */
+  --verde-900: #04342c;
+  --verde-800: #085041;
+  --verde-700: #0f6e56;
+  --verde-600: #1d9e75;
+  --verde-200: #9fe1cb;
+  --verde-50: #e1f5ee;
+
+  /* Superficies y texto */
+  --fondo: #f6f7f5;
+  --superficie: #ffffff;
+  --superficie-suave: #f1f3f0;
+  --texto: #1c2622;
+  --texto-suave: #5d6964;
+  --texto-tenue: #8a948f;
+  --linea: #e4e8e5;
+  --borde-campo: #cfd6d2;
+
+  /* Estados del calendario (los del prototipo, sección 8) */
+  --cerrado: #eaf3de;
+  --cerrado-borde: #97c459;
+  --cerrado-texto: #27500a;
+  --sin-cierre: #faeeda;
+  --sin-cierre-borde: #ba7517;
+  --sin-cierre-texto: #633806;
+  --no-abrio: #eeeeec;
+  --no-abrio-borde: #c9ccc9;
+
+  /* Mensajes */
+  --aviso-fondo: #faeeda;
+  --aviso-texto: #633806;
+  --error: #a32d2d;
+  --error-fondo: #fcebeb;
+  --exito: #0f6e56;
+  --info-fondo: #e6f1fb;
+  --info-texto: #0c447c;
+  --enlace: #0f6e56;
+
+  /* Forma */
+  --radio-tarjeta: 20px;
+  --radio-control: 14px;
+  --radio-pildora: 999px;
+  --sombra-1: 0 1px 2px rgb(16 32 26 / 0.06), 0 1px 3px rgb(16 32 26 / 0.06);
+  --sombra-2: 0 2px 4px rgb(16 32 26 / 0.05), 0 8px 24px rgb(16 32 26 / 0.08);
+  --sombra-3: 0 12px 40px rgb(16 32 26 / 0.18);
+
+  font-family: 'Nunito Variable', 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 18px; /* textos claros y grandes (RNF-05) */
+  line-height: 1.45;
+  color: var(--texto);
+  background: var(--fondo);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--fondo);
+}
+
+/* Con el panel del día abierto, la pantalla de atrás no se mueve (ver PanelLateral.vue) */
+body.sin-desplazar {
+  overflow: hidden;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+h2 {
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* Montos: los números no "saltan" al cambiar */
+.monto,
+.campo input {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Pantallas ---------- */
+
+.pantalla {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+  display: grid;
+  gap: 16px;
+}
+
+.con-navegacion .pantalla {
+  padding-bottom: calc(100px + env(safe-area-inset-bottom));
+}
+
+.pantalla.ancha {
+  max-width: 760px;
+}
+
+.suave {
+  color: var(--texto-suave);
+}
+
+.pequeno {
+  font-size: 0.85rem;
+}
+
+/* ---------- Tarjetas ---------- */
+
+.tarjeta {
+  background: var(--superficie);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-2);
+  padding: 20px 16px;
+  display: grid;
+  gap: 14px;
+}
+
+/* En una grilla, un hijo con contenido ancho (una tabla, un número largo) puede estirar toda la
+   pantalla hacia un lado. Con esto se ajusta al ancho del celular y, si hace falta, el contenido
+   se acomoda o se desliza adentro. */
+.pantalla > *,
+.tarjeta > * {
+  min-width: 0;
+}
+
+.recuadro {
+  background: var(--superficie-suave);
+  border-radius: var(--radio-control);
+  padding: 14px 16px;
+}
+
+/* ---------- Formularios ---------- */
+
+.formulario {
+  display: grid;
+  gap: 16px;
+}
+
+.campo {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--texto-suave);
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.control > .icono {
+  position: absolute;
+  left: 14px;
+  color: var(--texto-tenue);
+  pointer-events: none;
+}
+
+.campo input,
+.campo textarea,
+.campo select {
+  width: 100%;
+  min-height: 54px;
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--texto);
+  background: var(--superficie);
+  padding: 12px 16px;
+  border: 1.5px solid var(--borde-campo);
+  border-radius: var(--radio-control);
+  transition-property: border-color, box-shadow;
+  transition-duration: 150ms;
+}
+
+.control > .icono + input,
+.control > .prefijo + input {
+  padding-left: 46px;
+}
+
+.campo textarea {
+  min-height: 88px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.campo select {
+  appearance: none;
+  padding-right: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='%235d6964' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.campo input::placeholder,
+.campo textarea::placeholder {
+  color: var(--texto-tenue);
+  font-weight: 500;
+}
+
+.campo textarea:focus,
+.campo select:focus,
+.campo input:focus {
+  outline: none;
+  border-color: var(--verde-600);
+  box-shadow: 0 0 0 4px rgb(29 158 117 / 0.18);
+}
+
+.campo input:disabled {
+  background: var(--superficie-suave);
+}
+
+.campo .ayuda {
+  font-weight: 500;
+  color: var(--texto-tenue);
+}
+
+.casilla {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.casilla input {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  margin: 0;
+  accent-color: var(--verde-600);
+}
+
+/* ---------- Botones ---------- */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 14px 20px;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: var(--verde-600);
+  border: none;
+  border-radius: var(--radio-control);
+  box-shadow: 0 1px 2px rgb(4 52 44 / 0.2), inset 0 -2px 0 rgb(4 52 44 / 0.15);
+  cursor: pointer;
+  transition-property: background-color, transform, opacity;
+  transition-duration: 150ms;
+}
+
+.boton:hover {
+  background: var(--verde-700);
+}
+
+.boton:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.boton.secundario {
+  color: var(--verde-800);
+  background: var(--superficie);
+  box-shadow: inset 0 0 0 1.5px var(--borde-campo);
+}
+
+.boton.secundario:hover {
+  background: var(--verde-50);
+}
+
+/* Acciones que no se deshacen (anular): en rojo, con borde, para que no se toquen por error */
+.boton.peligro {
+  color: var(--error);
+  background: var(--superficie);
+  box-shadow: inset 0 0 0 1.5px var(--error);
+}
+
+.boton.peligro:hover {
+  background: var(--error-fondo);
+}
+
+.boton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.boton-texto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--enlace);
+  background: none;
+  border: none;
+  border-radius: var(--radio-control);
+  cursor: pointer;
+  transition-property: background-color;
+  transition-duration: 150ms;
+}
+
+.boton-texto:hover {
+  background: var(--verde-50);
+}
+
+/* ---------- Etiquetas y mensajes ---------- */
+
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radio-pildora);
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.etiqueta.cerrado {
+  background: var(--cerrado);
+  color: var(--cerrado-texto);
+}
+
+.etiqueta.sin_cierre,
+.etiqueta.aviso {
+  background: var(--sin-cierre);
+  color: var(--sin-cierre-texto);
+}
+
+.etiqueta.no_abrio {
+  background: var(--no-abrio);
+  color: var(--texto-suave);
+}
+
+/* Estados de un deudor (RN-37) */
+.etiqueta.pagado {
+  background: var(--cerrado);
+  color: var(--cerrado-texto);
+}
+
+.etiqueta.abono {
+  background: var(--info-fondo);
+  color: var(--info-texto);
+}
+
+.etiqueta.pendiente {
+  background: var(--sin-cierre);
+  color: var(--sin-cierre-texto);
+}
+
+.etiqueta.vencido,
+.etiqueta.peligro {
+  background: var(--error-fondo);
+  color: var(--error);
+}
+
+.mensaje {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radio-control);
+  font-weight: 600;
+}
+
+.mensaje svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.mensaje.aviso {
+  background: var(--aviso-fondo);
+  color: var(--aviso-texto);
+}
+
+.mensaje.error {
+  background: var(--error-fondo);
+  color: var(--error);
+}
+
+.mensaje.exito {
+  background: var(--verde-50);
+  color: var(--verde-800);
+}
+
+.error {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.exito {
+  color: var(--exito);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

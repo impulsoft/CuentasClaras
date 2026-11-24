@@ -1,0 +1,25 @@
+# Variables para la pestaña "Environment" del servicio Compose en Dokploy.
+# Copie esto allá y cambie cada valor. NO guarde los valores reales en el proyecto.
+
+# Dirección https de la API, sin /api al final (el dominio que le asigna al servicio "api" en Dokploy)
+APP_URL=https://api.su-dominio.co
+
+# Llave de Laravel. Créela en el PC, dentro de la carpeta api:  php artisan key:generate --show
+# (copie la línea completa, empieza con base64:). Si se cambia después, todos tienen que volver a entrar.
+APP_KEY=base64:CAMBIAR
+
+# Desde dónde se puede usar la API: la APK (https://localhost) y la página web (el dominio del servicio "web")
+CORS_ORIGENES=https://localhost,https://app.su-dominio.co
+
+# Contraseñas de la base de datos: largas y distintas entre sí (por ejemplo, 24 letras y números al azar)
+DB_PASSWORD=CAMBIAR
+DB_ROOT_PASSWORD=CAMBIAR
+
+# Cuenta del administrador que se crea la primera vez (despliegue/README.md, paso 6).
+# Después de entrar, cámbiela desde la app (Cuenta > Cambiar contraseña).
+ADMIN_USUARIO=admin
+ADMIN_CONTRASENA=CAMBIAR
+
+# Copias de la base de datos (opcional): hora de Colombia y cuántos días se guardan en el servidor
+RESPALDO_HORA=02:30
+RESPALDO_DIAS=14

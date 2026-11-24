@@ -1,0 +1,113 @@
+# Servidor de producción de Cierre de Caja, para desplegar con Dokploy (ver despliegue/README.md).
+#
+# Servicios:
+#   api          API de Laravel (lleva dominio en Dokploy, puerto 80)
+#   web          Página web de la app (lleva dominio en Dokploy, puerto 80)
+#   programador  Tareas diarias: borrar fotos viejas y datos de negocios vencidos (RN-34, RN-43)
+#   ocr          Lector de comprobantes y del cuaderno (solo lo usa la API, sin dominio)
+#   mysql        Base de datos (sin dominio)
+#   respaldo     Copia diaria de la base de datos en el volumen "respaldos"
+#
+# Las variables ${...} se ponen en la pestaña "Environment" de Dokploy (ver despliegue/variables.example).
+# No poner container_name ni publicar puertos: Dokploy se encarga de los dominios y del https.
+
+x-entorno-api: &entorno-api
+  APP_NAME: Cierre de Caja
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_KEY: ${APP_KEY:?Falta APP_KEY}
+  APP_URL: ${APP_URL:?Falta APP_URL (la dirección https de la API, sin /api)}
+  APP_LOCALE: es
+  APP_TIMEZONE: America/Bogota
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: warning
+  DB_CONNECTION: mysql
+  DB_HOST: mysql
+  DB_PORT: "3306"
+  DB_DATABASE: cierre_caja
+  DB_USERNAME: cierre
+  DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD}
+  OCR_URL: http://ocr:8001
+  ADMIN_USUARIO: ${ADMIN_USUARIO:-admin}
+  ADMIN_CONTRASENA: ${ADMIN_CONTRASENA:?Falta ADMIN_CONTRASENA}
+  CORS_ORIGENES: ${CORS_ORIGENES:?Falta CORS_ORIGENES}
+  # El proxy de Dokploy (Traefik) está en las redes internas de Docker. No usar "*" (ver bootstrap/app.php).
+  PROXIES_CONFIABLES: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+
+services:
+  api:
+    build: ./api
+    restart: unless-stopped
+    environment: *entorno-api
+    volumes:
+      - almacenamiento:/var/www/html/storage/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      ocr:
+        condition: service_started
+
+  programador:
+    build: ./api
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+    user: www-data
+    environment:
+      <<: *entorno-api
+      CIERRE_MIGRAR: "0"
+    volumes:
+      - almacenamiento:/var/www/html/storage/app
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy
+
+  ocr:
+    build: ./ocr
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./app
+      args:
+        VITE_API_URL: ${APP_URL:?Falta APP_URL}/api
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: cierre_caja
+      MYSQL_USER: cierre
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Falta DB_ROOT_PASSWORD}
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  respaldo:
+    build: ./despliegue/respaldo
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_DATABASE: cierre_caja
+      DB_USERNAME: cierre
+      DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD}
+      RESPALDO_HORA: ${RESPALDO_HORA:-02:30}
+      RESPALDO_DIAS: ${RESPALDO_DIAS:-14}
+    volumes:
+      - respaldos:/respaldos
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql:
+  almacenamiento:
+  respaldos:
