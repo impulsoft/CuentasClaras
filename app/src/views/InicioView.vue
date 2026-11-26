@@ -8,7 +8,6 @@ import PanelDia from '../components/PanelDia.vue'
 import PanelLateral from '../components/PanelLateral.vue'
 import EstadoSincronizacion from '../components/EstadoSincronizacion.vue'
 import ComprobantesPorRevisar from '../components/ComprobantesPorRevisar.vue'
-import ConfirmarComprobante from '../components/ConfirmarComprobante.vue'
 import NavegacionInferior from '../components/NavegacionInferior.vue'
 import AvisoSuscripcion from '../components/AvisoSuscripcion.vue'
 import { estadoDelDia, fechaDe, fechaLarga, hoy as fechaHoy, mejorYPeor, mesVecino, nombreMes, pesos, totalDelMes, totalesDelDia, type ResumenDia } from '../calculos'
@@ -176,7 +175,6 @@ const botonHoy = computed(() => {
       />
     </PanelLateral>
 
-    <ConfirmarComprobante />
     <NavegacionInferior />
   </div>
 </template>

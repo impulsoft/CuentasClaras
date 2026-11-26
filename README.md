@@ -155,15 +155,13 @@ docker build -t cierre-ocr .
 docker run -p 8001:8001 cierre-ocr
 ```
 
-Sin Docker, con Python (probado con Python 3.14):
+Sin Docker, con Python (probado con Python 3.14), en una terminal aparte que se deja abierta mientras se prueba:
 
-```bash
-cd ocr
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app:app --port 8001
+```powershell
+powershell -ExecutionPolicy Bypass -File ocr\iniciar.ps1
 ```
+
+El script crea el entorno de Python la primera vez (unos minutos) y arranca el lector en el puerto 8001. El entorno queda **fuera del proyecto**, en `C:\Users\<usuario>\EntornosPython\cierre-ocr` (o donde diga la variable `CIERRE_OCR_VENV`): el proyecto está en OneDrive y el entorno pesa unos 500 MB en miles de archivos que no deben subirse a la nube.
 
 - `GET /estado` comprueba que el servicio está arriba.
 - `POST /comprobante` recibe la foto de un comprobante en el campo `imagen` y devuelve las líneas leídas y los datos: valor, fecha, hora, nombre de quien paga y referencia (`comprobante.py`).
@@ -171,7 +169,9 @@ uvicorn app:app --port 8001
 - `POST /leer` devuelve solo las líneas de texto con su confianza.
 - `python -m unittest test_comprobante test_cuaderno` corre las pruebas de los lectores de comprobantes y del cuaderno.
 
-**Si la app dice "No se pudo leer la foto" en todas las fotos**, casi siempre es que el OCR no está corriendo: el registro de la API (`api/storage/logs/laravel.log`) muestra "El servicio OCR no responde". Arránquelo con los pasos de arriba; la API lo busca en `OCR_URL` (`http://127.0.0.1:8001`).
+**Si la app dice "No se pudo leer la foto" en todas las fotos**, casi siempre es que el OCR no está corriendo: el registro de la API (`api/storage/logs/laravel.log`) muestra "El servicio OCR no responde". Arránquelo con `ocr\iniciar.ps1`; la API lo busca en `OCR_URL` (`http://127.0.0.1:8001`). Si el OCR sí corre pero la imagen no es un comprobante (por ejemplo, el pantallazo de otra página), la app dice "En esta imagen no se ven los datos de un pago".
+
+Probando con el emulador de Android: la red virtual del emulador a veces pierde un byte en respuestas grandes (la primera sincronización de un negocio con mucha historia, unos 400 KB). La app muestra "No se pudo enviar" y vuelve a intentar; desde el PC la misma respuesta llega siempre completa. En un celular real no pasa (TCP no pierde bytes, y con https un daño se detecta como error de conexión).
 
 Velocidad: para los comprobantes, el servicio no revisa si el texto está girado y busca el texto en la imagen achicada a 960 px (`motor_comprobantes` en `app.py`). Con 8 comprobantes reales lee el mismo valor, fecha, hora y referencia y tarda un 38 % menos (de 2,8 a 1,7 s en un portátil de 12 núcleos con batería). El cuaderno usa la lectura completa, porque la letra a mano es más pequeña. En la app, la ventana del pago se abre apenas se toma la foto y los datos aparecen al terminar de leer.
 

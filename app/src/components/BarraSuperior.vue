@@ -2,10 +2,12 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
-import { IconBell, IconBuildingStore, IconKey, IconLogout, IconShieldCheck, IconUserCircle } from '@tabler/icons-vue'
+import { IconBell, IconBuildingStore, IconCamera, IconKey, IconLogout, IconShieldCheck, IconUserCircle } from '@tabler/icons-vue'
 import HojaInferior from './HojaInferior.vue'
 import { useSesionStore } from '../stores/sesion'
 import { useDialogoStore } from '../stores/dialogo'
+import { useSincronizacionStore } from '../stores/sincronizacion'
+import { useComprobantesStore } from '../stores/comprobantes'
 import { guardarAjuste, leerAjuste, programarRecordatorios } from '../recordatorio'
 
 // Barra verde de arriba: el negocio y el botón "Cuenta" (cambiar contraseña, RF-47, y salir, RF-02)
@@ -25,6 +27,22 @@ const HORAS = Array.from({ length: 13 }, (_, i) => {
   const m = String(minutos % 60).padStart(2, '0')
   return { valor: `${String(h).padStart(2, '0')}:${m}`, texto: `${h - 12}:${m} p. m.` }
 })
+
+/*
+ * Acceso directo a la cámara para un pago Nequi (RF-17), desde cualquier pantalla del dueño: la
+ * foto sigue el mismo camino que "Pago Nequi > Tomar foto" (la ventana del pago se abre de una vez
+ * y los datos aparecen al leerla). No sale para el admin ni si el negocio solo puede consultar.
+ */
+const sync = useSincronizacionStore()
+const comprobantes = useComprobantesStore()
+const entradaCamara = ref<HTMLInputElement | null>(null)
+
+async function alTomarFoto(evento: Event) {
+  const entrada = evento.target as HTMLInputElement
+  const archivo = entrada.files?.[0]
+  entrada.value = '' // para poder tomar otra foto después
+  if (archivo) await comprobantes.agregar('foto', archivo)
+}
 
 async function cambiarRecordatorio() {
   guardarAjuste({ ...recordatorio })
@@ -55,6 +73,13 @@ function salir() {
         <h1>{{ titulo }}</h1>
         <slot />
       </div>
+      <template v-if="!admin && !sync.soloConsulta">
+        <button class="salir" aria-label="Tomar foto de un pago Nequi" :disabled="comprobantes.leyendo" @click="entradaCamara?.click()">
+          <IconCamera :size="24" aria-hidden="true" />
+          <span>Nequi</span>
+        </button>
+        <input ref="entradaCamara" type="file" accept="image/*" capture="environment" hidden @change="alTomarFoto" />
+      </template>
       <button class="salir" @click="abierta = true">
         <IconUserCircle :size="24" aria-hidden="true" />
         <span>Cuenta</span>
@@ -150,6 +175,24 @@ h1 {
 
 .salir:hover {
   background: rgb(255 255 255 / 0.12);
+}
+
+.salir:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Los dos botones de la barra (Nequi y Cuenta) van juntos; el título se acorta si no cabe */
+.salir + input + .salir,
+.salir + .salir {
+  margin-left: -6px;
+}
+
+/* En el celular (hasta 430 px) el ícono de la tienda (solo adorno) se quita para que quepa el nombre del negocio */
+@media (max-width: 430px) {
+  .logo {
+    display: none;
+  }
 }
 
 .quien {

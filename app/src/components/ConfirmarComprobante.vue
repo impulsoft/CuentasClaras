@@ -96,6 +96,13 @@ watch(referencia, async (nueva, anterior) => {
 
 const sinLeer = computed(() => foto.value && !leyendoEsta.value && (!foto.value.leido || foto.value.estado === 'por_leer'))
 
+// Se leyó la imagen pero no tiene nada de un pago (por ejemplo, un pantallazo de otra cosa)
+const sinDatos = computed(() => {
+  const f = foto.value
+  if (!f || !f.leido || f.estado !== 'por_confirmar' || !f.campos) return false
+  return Object.values(f.campos).every((v) => v === null || v === '')
+})
+
 function cerrar() {
   comprobantes.revisando = null
 }
@@ -172,6 +179,10 @@ async function confirmar() {
           <p v-else-if="sinLeer" class="mensaje aviso">
             <IconAlertTriangle :size="20" aria-hidden="true" />
             No se pudo leer la foto. Escriba los datos mirando el comprobante.
+          </p>
+          <p v-else-if="sinDatos" class="mensaje aviso">
+            <IconAlertTriangle :size="20" aria-hidden="true" />
+            En esta imagen no se ven los datos de un pago. Revise que sea el comprobante de Nequi; si lo es, escriba los datos.
           </p>
 
           <!-- Aviso contra comprobantes falsos (solo para fotos del celular del cliente) -->

@@ -6,7 +6,7 @@ import EstadoSincronizacion from '../components/EstadoSincronizacion.vue'
 import NavegacionInferior from '../components/NavegacionInferior.vue'
 import AvisoSuscripcion from '../components/AvisoSuscripcion.vue'
 import { fechaCorta, hoy as fechaHoy, pesos } from '../calculos'
-import { coincideBusqueda, NOMBRE_ESTADO, pagaHoy, textoPlazo, type EstadoDeudor, type ResumenDeudor } from '../deudas'
+import { coincideBusqueda, NOMBRE_ESTADO, pagaHoy, textoPlazo, type ResumenDeudor } from '../deudas'
 import { useDeudoresStore } from '../stores/deudores'
 import { useSesionStore } from '../stores/sesion'
 import { useSincronizacionStore } from '../stores/sincronizacion'
@@ -18,19 +18,9 @@ const sesion = useSesionStore()
 const sync = useSincronizacionStore()
 const salir = useSalir()
 
+// Solo la búsqueda por nombre o teléfono: la lista ya trae primero a los vencidos (RF-41)
 const busqueda = ref('')
-const filtro = ref<EstadoDeudor | 'todos'>('todos')
-const filtros: { valor: EstadoDeudor | 'todos'; texto: string }[] = [
-  { valor: 'todos', texto: 'Todos' },
-  { valor: 'vencido', texto: 'Vencidos' },
-  { valor: 'pendiente', texto: 'Pendientes' },
-  { valor: 'abono', texto: 'Abonó' },
-  { valor: 'pagado', texto: 'Pagados' },
-]
-
-const visibles = computed(() =>
-  deudores.lista.filter((d) => (filtro.value === 'todos' || d.estado === filtro.value) && coincideBusqueda(d, busqueda.value)),
-)
+const visibles = computed(() => deudores.lista.filter((d) => coincideBusqueda(d, busqueda.value)))
 
 const t = computed(() => deudores.totales)
 const resumenTotales = computed(() => {
@@ -87,20 +77,6 @@ function detalle(d: ResumenDeudor): string {
             <input v-model="busqueda" type="search" placeholder="Nombre o teléfono" autocomplete="off" />
           </span>
         </label>
-        <div class="filtros" role="group" aria-label="Filtrar por estado">
-          <button
-            v-for="f in filtros"
-            :key="f.valor"
-            type="button"
-            class="filtro"
-            :class="{ activo: filtro === f.valor }"
-            :aria-pressed="filtro === f.valor"
-            @click="filtro = f.valor"
-          >
-            {{ f.texto }}
-          </button>
-        </div>
-
         <ul class="lista">
           <li v-for="d in visibles" :key="d.deudor.id">
             <RouterLink :to="{ name: 'deudor', params: { id: d.deudor.id } }" class="deudor" :class="d.estado">
@@ -118,7 +94,7 @@ function detalle(d: ResumenDeudor): string {
             </RouterLink>
           </li>
         </ul>
-        <p v-if="!visibles.length" class="vacio suave">No hay deudores con ese nombre o estado.</p>
+        <p v-if="!visibles.length" class="vacio suave">No hay deudores con ese nombre o teléfono.</p>
       </template>
 
       <section v-else-if="!deudores.cargando" class="tarjeta vacio-inicial">
@@ -173,37 +149,6 @@ function detalle(d: ResumenDeudor): string {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-.filtros {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.filtro {
-  min-height: 44px;
-  padding: 8px 16px;
-  font: inherit;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--texto);
-  background: var(--superficie);
-  border: 1.5px solid var(--borde-campo);
-  border-radius: var(--radio-pildora);
-  cursor: pointer;
-  transition-property: background-color, border-color, color, transform;
-  transition-duration: 150ms;
-}
-
-.filtro:active {
-  transform: scale(0.96);
-}
-
-.filtro.activo {
-  color: #ffffff;
-  background: var(--verde-700);
-  border-color: var(--verde-700);
 }
 
 .lista {

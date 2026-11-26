@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconChevronLeft, IconChevronRight, IconTrendingDown, IconTrendingUp } from '@tabler/icons-vue'
+import { IconChevronDown, IconChevronLeft, IconChevronRight, IconTrendingDown, IconTrendingUp } from '@tabler/icons-vue'
 import GraficaBarras, { type Barra } from './GraficaBarras.vue'
 import DesgloseMedios from './DesgloseMedios.vue'
 import { fechaLarga, mesVecino, nombreMes, pesos } from '../calculos'
@@ -99,6 +99,22 @@ const barras = computed<Barra[]>(() => {
     }))
   }
   return anual.value.map((a) => ({ clave: a.clave, etiqueta: a.clave, titulo: `Año ${a.clave}`, valor: a.desglose.total }))
+})
+
+/*
+ * RF-21: la lista "tipo cuaderno". Por día (hasta 31 renglones) y por mes va plegada: la gráfica
+ * de arriba ya muestra cada día, así que en su lugar sale un resumen con el promedio y un botón
+ * para verla completa. Por año son pocos renglones y se muestra abierta.
+ */
+const listaAbierta = ref(false)
+watch([vista, anio, mes], () => (listaAbierta.value = false))
+const plegable = computed(() => vista.value !== 'anio')
+const conCierre = computed(() => filas.value.filter((f) => !f.apagado).length)
+const promedio = computed(() => (conCierre.value ? Math.round(resumen.value.total / conCierre.value) : 0))
+const textoResumenLista = computed(() => {
+  const unidad = vista.value === 'dia' ? ['día', 'días'] : ['mes', 'meses']
+  if (!conCierre.value) return `Ningún ${unidad[0]} con cierre todavía`
+  return `${conCierre.value} ${conCierre.value === 1 ? unidad[0] : unidad[1]} con cierre · promedio ${pesos(promedio.value)} por ${unidad[0]}`
 })
 
 // RF-21: la lista "tipo cuaderno", con el total de cada día, mes o año
@@ -262,7 +278,14 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
     <!-- RF-21 -->
     <section v-if="filas.length" class="tarjeta">
       <h2>{{ titulos[vista] }}</h2>
-      <ul class="filas">
+      <template v-if="plegable">
+        <p class="suave">{{ textoResumenLista }}</p>
+        <button type="button" class="boton secundario ver-lista" :aria-expanded="listaAbierta" @click="listaAbierta = !listaAbierta">
+          {{ listaAbierta ? 'Ocultar la lista' : `Ver los ${filas.length} ${vista === 'dia' ? 'días' : 'meses'}` }}
+          <IconChevronDown class="flecha-lista" :class="{ abierta: listaAbierta }" :size="22" aria-hidden="true" />
+        </button>
+      </template>
+      <ul v-if="!plegable || listaAbierta" class="filas">
         <li v-for="f in filas" :key="f.clave" :class="{ apagado: f.apagado }">
           <span class="nombre">{{ f.nombre }}</span>
           <span v-if="f.extra" class="suave pequeno">{{ f.extra }}</span>
@@ -445,9 +468,24 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
   display: flex;
   align-items: baseline;
   gap: 10px;
-  min-height: 44px;
-  padding: 10px 0;
+  min-height: 40px;
+  padding: 8px 0;
   border-bottom: 1px solid var(--linea);
+}
+
+/* Botón para abrir o cerrar la lista día a día (o mes a mes) */
+.ver-lista {
+  width: 100%;
+  min-height: 48px;
+}
+
+.flecha-lista {
+  transition-property: transform;
+  transition-duration: 200ms;
+}
+
+.flecha-lista.abierta {
+  transform: rotate(180deg);
 }
 
 .filas .nombre {

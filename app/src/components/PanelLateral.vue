@@ -172,8 +172,17 @@ h2 {
   transform: translateX(-100%);
 }
 
-/* Si el celular pide menos movimiento, solo aparece y desaparece */
+/*
+ * Si el equipo pide menos movimiento (por ejemplo, Windows con los "Efectos de animación" apagados),
+ * el panel no se desliza: aparece y se va con un desvanecido suave. Las reglas llevan !important y
+ * dos clases para ganarle a la regla general de style.css que apaga todas las transiciones.
+ */
 @media (prefers-reduced-motion: reduce) {
+  .fondo.lateral-enter-active,
+  .fondo.lateral-leave-active {
+    transition: opacity 200ms ease !important;
+  }
+
   .lateral-enter-active .lateral,
   .lateral-leave-active .lateral {
     transition: none;

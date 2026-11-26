@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSesionStore } from './stores/sesion'
 import { useSincronizacionStore } from './stores/sincronizacion'
 import VentanaDialogo from './components/VentanaDialogo.vue'
+import ConfirmarComprobante from './components/ConfirmarComprobante.vue'
 import { cancelarRecordatorios, programarRecordatorios } from './recordatorio'
 
 const sesion = useSesionStore()
@@ -49,5 +50,8 @@ watch(
 
 <template>
   <RouterView />
+  <!-- Revisar el pago Nequi leído de una foto: va aquí para que el botón de la cámara de la barra
+       de arriba funcione desde cualquier pantalla del dueño (Caja, Deudores, Análisis) -->
+  <ConfirmarComprobante v-if="sesion.conSesion && !sesion.esAdmin" />
   <VentanaDialogo />
 </template>
