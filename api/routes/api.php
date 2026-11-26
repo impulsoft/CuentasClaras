@@ -46,11 +46,15 @@ Route::middleware(['auth:sanctum', 'cuenta.activa', 'sesion.vigente'])->group(fu
     // Admin
     Route::middleware('rol:admin')->prefix('admin')->group(function () {
         Route::get('/resumen', [Admin\NegocioController::class, 'resumen']);
+        Route::get('/recaudo', [Admin\RecaudoController::class, 'index']);
+        Route::get('/recaudo/excel', [Admin\RecaudoController::class, 'excel']);
         Route::get('/negocios', [Admin\NegocioController::class, 'index']);
         Route::post('/negocios', [Admin\NegocioController::class, 'store']);
         Route::get('/negocios/{negocio}', [Admin\NegocioController::class, 'show']);
         Route::put('/negocios/{negocio}', [Admin\NegocioController::class, 'update']);
         Route::post('/negocios/{negocio}/pagos', [Admin\NegocioController::class, 'registrarPago']);
+        Route::post('/negocios/{negocio}/pagos/{pago}/anular', [Admin\NegocioController::class, 'anularPago']);
+        Route::post('/negocios/{negocio}/retirar', [Admin\NegocioController::class, 'retirar']);
         Route::post('/negocios/{negocio}/bloquear', [Admin\NegocioController::class, 'bloquear']);
         Route::post('/negocios/{negocio}/desbloquear', [Admin\NegocioController::class, 'desbloquear']);
         Route::post('/negocios/{negocio}/desactivar', [Admin\NegocioController::class, 'desactivar']);

@@ -1,14 +1,9 @@
 <?php
 
-use App\Models\Abono;
-use App\Models\Cierre;
-use App\Models\Deudor;
-use App\Models\Fiado;
 use App\Models\Negocio;
 use App\Models\Pago;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Storage;
 
@@ -67,20 +62,7 @@ Artisan::command('negocios:borrar-datos-vencidos {--simular : Solo muestra qué 
             return;
         }
 
-        DB::transaction(function () use ($negocio) {
-            $delNegocio = fn (string $modelo) => $modelo::withoutGlobalScopes()->where('negocio_id', $negocio->id);
-            $fotos = $delNegocio(Pago::class)->whereNotNull('foto_ruta')->pluck('foto_ruta');
-
-            $delNegocio(Abono::class)->delete();
-            $delNegocio(Fiado::class)->delete();
-            $delNegocio(Deudor::class)->delete();
-            $delNegocio(Pago::class)->delete();
-            $delNegocio(Cierre::class)->delete();
-            $negocio->update(['datos_borrados_en' => now()]);
-
-            Storage::disk('local')->delete($fotos->all());
-            Storage::disk('local')->deleteDirectory("comprobantes/{$negocio->id}");
-        });
+        $negocio->borrarDatos(); // lo mismo que el retiro a pedido del dueño
         $borrados++;
     });
 

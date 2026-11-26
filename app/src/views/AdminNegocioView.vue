@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
   IconAlertTriangle,
   IconCalendarEvent,
   IconChartBar,
   IconCash,
+  IconDownload,
   IconKey,
   IconLock,
   IconLockOpen,
   IconPencil,
+  IconTrash,
   IconUserCheck,
   IconUserOff,
 } from '@tabler/icons-vue'
 import BarraVolver from '../components/BarraVolver.vue'
+import DescargarExcel from '../components/DescargarExcel.vue'
+import FilaPagoSuscripcion from '../components/FilaPagoSuscripcion.vue'
+import MesesSuscripcion from '../components/MesesSuscripcion.vue'
 import HojaInferior from '../components/HojaInferior.vue'
 import RegistrarPagoSuscripcion from '../components/RegistrarPagoSuscripcion.vue'
 import { fechaCorta, fechaLarga, hoy, pesos } from '../calculos'
-import { COLOR_SUSCRIPCION, haceCuanto, necesitaAyuda, NOMBRE_SUSCRIPCION, textoVencimiento, useAdminApi, type DetalleNegocio } from '../admin'
+import { COLOR_SUSCRIPCION, haceCuanto, necesitaAyuda, NOMBRE_SUSCRIPCION, textoVencimiento, useAdminApi, type DetalleNegocio, type PagoSuscripcion } from '../admin'
 import { ErrorApi } from '../api'
 import { useDialogoStore } from '../stores/dialogo'
 
@@ -119,9 +124,81 @@ async function guardarEdicion() {
 }
 
 const pagando = ref(false)
+// Además de la cuadrícula por meses, la lista de todos los pagos (plegada)
+const listaPagos = ref(false)
 function alPagar(actualizado: DetalleNegocio) {
   negocio.value = actualizado
   pagando.value = false
+}
+
+// Un pago registrado por error se anula con su motivo; no se borra y el vencimiento se recalcula
+async function anular(pago: PagoSuscripcion) {
+  const n = negocio.value!
+  const motivo = await dialogo.pedirTexto(
+    `¿Anular el pago de ${pesos(pago.valor)} del ${fechaCorta(pago.fecha)} ${pago.fecha.slice(0, 4)}?`,
+    'Escriba por qué se anula (por ejemplo: "lo registré dos veces")',
+    '',
+    'Anular pago',
+  )
+  if (!motivo) return
+  try {
+    negocio.value = await api.anularPago(n.id, pago.id, motivo)
+    const quedo = negocio.value.suscripcion.estado
+    dialogo.avisar(quedo === 'vencida' || quedo === 'sin_pago' ? 'Pago anulado. Ojo: la suscripción quedó vencida.' : 'Pago anulado')
+  } catch {
+    dialogo.avisar('No se pudo anular el pago. Revise la conexión.')
+  }
+}
+
+/*
+ * El dueño pidió cancelar el servicio y borrar su información (Ley 1581). Primero se le ofrece su
+ * Excel; para borrar hay que escribir el nombre del negocio, así no se hace por un toque sin querer.
+ */
+const retirando = ref(false)
+const descargando = ref(false)
+const confirmacion = ref('')
+const errorRetiro = ref('')
+const borrando = ref(false)
+// Igual que en la API: sin importar mayúsculas, tildes ni espacios de más
+const normalizar = (texto: string) =>
+  texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+const nombreCoincide = computed(() => !!negocio.value && normalizar(confirmacion.value) === normalizar(negocio.value.nombre))
+
+function abrirRetiro() {
+  confirmacion.value = ''
+  errorRetiro.value = ''
+  retirando.value = true
+}
+
+// El Excel se abre en su propia ventana; al cerrarla se vuelve a la del retiro
+function descargarAntes() {
+  retirando.value = false
+  descargando.value = true
+}
+function alCerrarExcel() {
+  descargando.value = false
+  retirando.value = true
+}
+
+async function retirar() {
+  if (!nombreCoincide.value || borrando.value) return
+  errorRetiro.value = ''
+  borrando.value = true
+  try {
+    negocio.value = await api.retirar(props.id, confirmacion.value)
+    retirando.value = false
+    dialogo.avisar('Negocio retirado y datos borrados')
+  } catch (e) {
+    const sinConexion = e instanceof ErrorApi && e.sinConexion
+    errorRetiro.value = sinConexion ? 'Sin conexión. Para retirar el negocio necesita internet.' : (e instanceof ErrorApi && e.de('confirmacion')) || 'No se pudo retirar. Intente de nuevo.'
+  } finally {
+    borrando.value = false
+  }
 }
 </script>
 
@@ -144,7 +221,7 @@ function alPagar(actualizado: DetalleNegocio) {
         <!-- RN-34 -->
         <p v-if="negocio.datos_borrados_en" class="mensaje error" role="status">
           <IconAlertTriangle :size="20" aria-hidden="true" />
-          Los datos de este negocio se borraron por llevar 6 meses sin servicio.
+          Los datos de este negocio se borraron el {{ conAnio(negocio.datos_borrados_en.slice(0, 10)) }}.
         </p>
         <p v-else-if="negocio.datos_se_borran_el" class="mensaje error" role="status">
           <IconAlertTriangle :size="20" aria-hidden="true" />
@@ -164,16 +241,16 @@ function alPagar(actualizado: DetalleNegocio) {
           </div>
           <button class="boton" @click="pagando = true"><IconCash :size="22" aria-hidden="true" /> Registrar pago</button>
 
-          <h3>Pagos</h3>
-          <ul v-if="negocio.pagos.length" class="lista">
-            <li v-for="p in negocio.pagos" :key="p.id">
-              <span class="datos">
-                <span>{{ fechaCorta(p.fecha) }} {{ p.fecha.slice(0, 4) }}<template v-if="p.nota"> · {{ p.nota }}</template></span>
-                <span class="suave pequeno">Hasta el {{ fechaCorta(p.vence_el) }} {{ p.vence_el.slice(0, 4) }}</span>
-              </span>
-              <strong class="monto">{{ pesos(p.valor) }}</strong>
-            </li>
-          </ul>
+          <h3>Pagos por mes</h3>
+          <template v-if="negocio.pagos.length">
+            <MesesSuscripcion :pagos="negocio.pagos" :hoy="hoy()" :cliente-desde="negocio.suscripcion.inicio_el" @anular="anular" />
+            <button v-if="negocio.pagos.length > 1" type="button" class="boton-texto ver-lista" :aria-expanded="listaPagos" @click="listaPagos = !listaPagos">
+              {{ listaPagos ? 'Ocultar la lista de pagos' : `Ver los ${negocio.pagos.length} pagos en una lista` }}
+            </button>
+            <ul v-if="listaPagos" class="lista">
+              <FilaPagoSuscripcion v-for="p in negocio.pagos" :key="p.id" :pago="p" @anular="anular" />
+            </ul>
+          </template>
           <p v-else class="suave">Todavía no hay pagos registrados.</p>
         </section>
 
@@ -242,8 +319,36 @@ function alPagar(actualizado: DetalleNegocio) {
             <button v-else class="boton secundario" @click="hacer('activar')"><IconUserCheck :size="22" aria-hidden="true" /> Activar cuenta</button>
           </div>
         </section>
+
+        <!-- A pedido del dueño (Ley 1581): no se puede deshacer -->
+        <section v-if="!negocio.datos_borrados_en" class="tarjeta">
+          <h2>Cancelar el servicio</h2>
+          <p class="suave">Si el dueño pide dejar de usar Cierre de Caja y que se borre su información, hágalo aquí.</p>
+          <button class="boton secundario peligro" @click="abrirRetiro"><IconTrash :size="22" aria-hidden="true" /> Retirar negocio</button>
+        </section>
       </template>
     </main>
+
+    <HojaInferior :abierta="retirando" titulo="Retirar negocio" @cerrar="retirando = false" @enviar="retirar">
+      <p class="mensaje error">
+        <IconAlertTriangle :size="20" aria-hidden="true" />
+        Se borran para siempre los cierres, pagos, fotos de comprobantes, fiados y deudores de {{ negocio?.nombre }}, y la cuenta de
+        {{ negocio?.dueno?.nombre }} queda desactivada. No se puede deshacer.
+      </p>
+      <p><strong>1.</strong> Antes, descargue su información en Excel para entregársela al dueño.</p>
+      <button type="button" class="boton secundario" @click="descargarAntes"><IconDownload :size="22" aria-hidden="true" /> Descargar Excel</button>
+      <label class="campo">
+        <span class="paso"><strong>2.</strong> Para confirmar, escriba el nombre del negocio: <strong>{{ negocio?.nombre }}</strong></span>
+        <span class="control"><input v-model="confirmacion" autocomplete="off" autocapitalize="off" spellcheck="false" /></span>
+        <span v-if="errorRetiro" class="error">{{ errorRetiro }}</span>
+      </label>
+      <template #acciones>
+        <button type="button" class="boton secundario" @click="retirando = false">Cancelar</button>
+        <button class="boton borrar" :disabled="!nombreCoincide || borrando">{{ borrando ? 'Borrando…' : 'Borrar todo' }}</button>
+      </template>
+    </HojaInferior>
+
+    <DescargarExcel :abierta="descargando" :ruta="`/admin/negocios/${id}/excel`" inicial="todo" @cerrar="alCerrarExcel" />
 
     <RegistrarPagoSuscripcion :negocio="pagando ? negocio : null" @cerrar="pagando = false" @pagado="alPagar" />
 
@@ -314,29 +419,42 @@ h3 {
   padding: 0;
 }
 
-.lista li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 52px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--linea);
+.ver-lista {
+  justify-self: center;
+  min-height: 44px;
 }
 
-.datos {
-  min-width: 0;
-  display: grid;
+/* El paso 2 se lee igual que el paso 1 (la etiqueta de un campo es más pequeña) */
+.paso {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--texto);
+}
+
+.borrar {
+  color: #fff;
+  background: var(--error);
+  border-color: var(--error);
+}
+
+.borrar:disabled {
+  opacity: 0.45;
 }
 
 .boton {
   text-decoration: none;
 }
 
+/* minmax(0, 1fr): con 1fr solo, a 320 px los dos botones empujaban la página de lado */
 .dos-botones {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.dos-botones .boton {
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .actividad {

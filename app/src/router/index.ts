@@ -20,6 +20,7 @@ const AdminAnalisisView = () => import('../views/AdminAnalisisView.vue')
 // Panel del admin (fase 4)
 const AdminNegocioView = () => import('../views/AdminNegocioView.vue')
 const AdminCierresView = () => import('../views/AdminCierresView.vue')
+const AdminRecaudoView = () => import('../views/AdminRecaudoView.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -46,6 +47,7 @@ const router = createRouter({
     { path: '/cargar/:tipo(excel|cuaderno)', name: 'cargar', component: CargarView, props: true, meta: { rol: 'dueno' } },
     { path: '/contrasena', name: 'contrasena', component: ContrasenaView },
     { path: '/admin', name: 'admin', component: AdminView, meta: { rol: 'admin' } },
+    { path: '/admin/recaudo', name: 'admin-recaudo', component: AdminRecaudoView, meta: { rol: 'admin' } },
     { path: '/admin/negocios/:id', name: 'admin-negocio', component: AdminNegocioView, props: true, meta: { rol: 'admin' } },
     { path: '/admin/negocios/:id/cierres', name: 'admin-cierres', component: AdminCierresView, props: true, meta: { rol: 'admin' } },
     { path: '/admin/negocios/:id/analisis', name: 'admin-analisis', component: AdminAnalisisView, props: true, meta: { rol: 'admin' } },

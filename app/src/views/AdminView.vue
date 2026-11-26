@@ -19,13 +19,20 @@ import RegistrarPagoSuscripcion from '../components/RegistrarPagoSuscripcion.vue
 import { fechaCorta, hoy, pesos } from '../calculos'
 import {
   COLOR_SUSCRIPCION,
+  contarGrupos,
   DIAS_SIN_CIERRE,
+  filtrarNegocios,
+  GRUPOS,
   enlaceAyuda,
+  enlaceCobro,
+  enGrupo,
   NOMBRE_SUSCRIPCION,
   porAyudar,
+  porVencer,
   textoUltimoCierre,
   textoVencimiento,
   useAdminApi,
+  type GrupoNegocio,
   type NegocioAdmin,
   type ResumenAdmin,
 } from '../admin'
@@ -56,27 +63,31 @@ async function cargar() {
 }
 onMounted(cargar)
 
+// Las cifras se cuentan igual que el filtro de la lista: los desactivados no cuentan como vencidos
 const cifras = computed(() => [
-  { valor: resumen.value?.activos, texto: 'Al día', clase: 'activo' },
-  { valor: resumen.value?.por_vencer, texto: 'Por vencer', clase: 'aviso' },
-  { valor: resumen.value?.vencidos, texto: 'Vencidos', clase: 'peligro' },
+  { valor: cuenta.value.al_dia, texto: 'Al día', clase: 'activo' },
+  { valor: cuenta.value.por_vencer, texto: 'Por vencer', clase: 'aviso' },
+  { valor: cuenta.value.vencidos, texto: 'Vencidos', clase: 'peligro' },
 ])
 
 // RF-11: "Suscripción vencida: Tienda Don José" con "Ya pagó" o "Bloquear"
-const vencidos = computed(() =>
-  negocios.value.filter((n) => (n.suscripcion.estado === 'vencida' || n.suscripcion.estado === 'sin_pago') && !n.datos_borrados_en),
-)
+const vencidos = computed(() => negocios.value.filter((n) => enGrupo(n, 'vencidos')))
+
+// Les faltan 5 días o menos: un recordatorio a tiempo evita tener que bloquear
+const proximos = computed(() => porVencer(negocios.value))
 
 // Negocios que llevan días sin registrar el cierre: el admin los llama antes de que dejen la app
 const ayudar = computed(() => porAyudar(negocios.value, hoy()))
 const telefonoDe = (n: NegocioAdmin) => (n.dueno?.telefono ?? n.telefono ?? '').replace(/\D/g, '')
 
+// Filtro por estado y búsqueda. Solo se muestran los grupos que tienen negocios.
 const busqueda = ref('')
-const visibles = computed(() => {
-  const texto = busqueda.value.trim().toLowerCase()
-  if (!texto) return negocios.value
-  return negocios.value.filter((n) => [n.nombre, n.dueno?.nombre, n.dueno?.usuario].some((v) => v?.toLowerCase().includes(texto)))
-})
+const filtro = ref<GrupoNegocio | 'todos'>('todos')
+const cuenta = computed(() => contarGrupos(negocios.value))
+const grupos = computed(() => GRUPOS.filter((g) => g.valor === 'todos' || cuenta.value[g.valor] > 0))
+// Si el grupo escogido se queda sin negocios (por ejemplo, después de "Ya pagó"), se vuelve a "Todos"
+const filtroActivo = computed(() => (filtro.value === 'todos' || cuenta.value[filtro.value] > 0 ? filtro.value : 'todos'))
+const visibles = computed(() => filtrarNegocios(negocios.value, filtroActivo.value, busqueda.value))
 
 const pagando = ref<NegocioAdmin | null>(null)
 async function alPagar() {
@@ -169,10 +180,11 @@ const iniciales = (nombre: string) =>
           <span class="valor monto" :class="c.clase">{{ cargando ? '–' : c.valor }}</span>
           <span class="suave">{{ c.texto }}</span>
         </div>
-        <div class="cifra tarjeta recaudado">
+        <RouterLink :to="{ name: 'admin-recaudo' }" class="cifra tarjeta recaudado">
           <span class="valor monto">{{ cargando ? '–' : pesos(resumen?.recaudado_mes ?? 0) }}</span>
           <span class="suave">Recaudado este mes</span>
-        </div>
+          <span class="ver">Ver mes a mes <IconChevronRight :size="16" aria-hidden="true" /></span>
+        </RouterLink>
       </section>
 
       <!-- RF-11 -->
@@ -187,8 +199,33 @@ const iniciales = (nombre: string) =>
               </span>
             </div>
             <div class="botones-alerta">
-              <button class="boton" @click="pagando = n">Ya pagó</button>
+              <a v-if="enlaceCobro(n)" class="boton secundario whatsapp ancho" :href="enlaceCobro(n)!" target="_blank" rel="noopener">
+                <IconBrandWhatsapp :size="20" aria-hidden="true" /> Cobrar por WhatsApp
+              </a>
+              <button class="boton" :class="{ ancho: n.estado === 'bloqueado' }" @click="pagando = n">Ya pagó</button>
               <button v-if="n.estado !== 'bloqueado'" class="boton secundario peligro" @click="bloquear(n)">Bloquear</button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Por vencer: cobrar antes de que venza -->
+      <section v-if="proximos.length" class="tarjeta alertas aviso" aria-label="Suscripciones por vencer">
+        <h2>Por vencer</h2>
+        <p class="suave pequeno">Les faltan pocos días. Un recordatorio a tiempo evita tener que bloquear.</p>
+        <ul class="lista">
+          <li v-for="n in proximos" :key="n.id" class="alerta">
+            <div class="datos">
+              <strong>{{ n.nombre }}</strong>
+              <span class="suave pequeno">
+                {{ textoVencimiento(n.suscripcion.dias) }}<template v-if="n.ultimo_valor"> · {{ pesos(n.ultimo_valor) }}</template>
+              </span>
+            </div>
+            <div class="botones-alerta">
+              <a v-if="enlaceCobro(n)" class="boton secundario whatsapp" :href="enlaceCobro(n)!" target="_blank" rel="noopener">
+                <IconBrandWhatsapp :size="20" aria-hidden="true" /> WhatsApp
+              </a>
+              <button class="boton" :class="{ ancho: !enlaceCobro(n) }" @click="pagando = n">Ya pagó</button>
             </div>
           </li>
         </ul>
@@ -226,8 +263,23 @@ const iniciales = (nombre: string) =>
             <input v-model="busqueda" type="search" placeholder="Buscar negocio o dueño" aria-label="Buscar negocio o dueño" />
           </span>
         </label>
+        <!-- Filtro por estado: aparece cuando hay negocios en más de un grupo -->
+        <div v-if="grupos.length > 2" class="filtros" role="group" aria-label="Mostrar negocios">
+          <button
+            v-for="g in grupos"
+            :key="g.valor"
+            type="button"
+            class="filtro"
+            :class="{ activo: filtroActivo === g.valor }"
+            :aria-pressed="filtroActivo === g.valor"
+            @click="filtro = g.valor"
+          >
+            {{ g.texto }} <span class="cuenta">{{ cuenta[g.valor] }}</span>
+          </button>
+        </div>
         <p v-if="cargando" class="suave">Cargando…</p>
         <p v-else-if="!negocios.length && !errorLista" class="suave">Todavía no hay negocios registrados.</p>
+        <p v-else-if="!visibles.length" class="suave">Ningún negocio coincide con la búsqueda.</p>
         <ul v-else class="lista">
           <li v-for="n in visibles" :key="n.id">
             <RouterLink :to="{ name: 'admin-negocio', params: { id: n.id } }" class="fila">
@@ -337,8 +389,78 @@ const iniciales = (nombre: string) =>
   color: var(--verde-800);
 }
 
+/* El cuadro de lo recaudado lleva a la pantalla de mes a mes */
+a.recaudado {
+  color: inherit;
+  text-decoration: none;
+}
+
+.recaudado .ver {
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--verde-700);
+}
+
+.recaudado .ver svg {
+  vertical-align: -3px;
+}
+
+/* Botones del filtro en un renglón que se desliza de lado. Sin "gap" en flex: Android 7 no lo tiene */
+.filtros {
+  display: flex;
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 2px 4px 6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.filtros::-webkit-scrollbar {
+  display: none;
+}
+
+.filtro {
+  flex: none;
+  min-height: 40px;
+  margin-right: 8px;
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1.5px solid var(--borde-campo);
+  border-radius: var(--radio-pildora);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filtro:last-child {
+  margin-right: 0;
+}
+
+.filtro .cuenta {
+  margin-left: 4px;
+  color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.filtro.activo {
+  color: var(--verde-800);
+  background: var(--verde-50);
+  border-color: var(--verde-600);
+}
+
+.filtro.activo .cuenta {
+  color: var(--verde-700);
+}
+
 .alertas {
   border: 1.5px solid var(--error-fondo);
+}
+
+.alertas.aviso {
+  border-color: var(--aviso-fondo);
 }
 
 .encabezado {
@@ -396,6 +518,12 @@ const iniciales = (nombre: string) =>
   min-height: 44px;
   padding: 8px 14px;
   font-size: 0.95rem;
+  text-decoration: none; /* los de WhatsApp y Llamar son enlaces */
+}
+
+/* Botón solo en su renglón (el WhatsApp de los vencidos, o "Ya pagó" cuando va sin compañero) */
+.botones-alerta .ancho {
+  grid-column: 1 / -1;
 }
 
 .boton.peligro {

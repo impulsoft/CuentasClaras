@@ -8,7 +8,23 @@ import { useSesionStore } from '../stores/sesion'
 import { useDialogoStore } from '../stores/dialogo'
 
 // RF-26: descargar los cierres de un mes, un año o un rango de fechas. Necesita internet.
-const props = defineProps<{ abierta: boolean; ruta: string; antes?: () => Promise<void>; inicial?: 'mes' | 'anio' | 'todo' }>()
+// También sirve para el Excel de los pagos de la suscripción del admin (otro nombre y otra explicación)
+const props = withDefaults(
+  defineProps<{
+    abierta: boolean
+    ruta: string
+    antes?: () => Promise<void>
+    inicial?: 'mes' | 'anio' | 'todo'
+    nombre?: string
+    descripcion?: string
+  }>(),
+  {
+    antes: undefined,
+    inicial: 'mes',
+    nombre: 'cierres',
+    descripcion: 'Un día por fila, con la base, el efectivo, la plata que sacó de la caja, el Nequi y los otros pagos.',
+  },
+)
 const emit = defineEmits<{ cerrar: [] }>()
 const sesion = useSesionStore()
 const dialogo = useDialogoStore()
@@ -45,7 +61,7 @@ async function bajar() {
   try {
     await props.antes?.() // el dueño envía primero lo que tiene sin sincronizar
     // Si cerró "Compartir" sin escoger nada, la ventana queda abierta para intentar otra vez
-    if (!(await descargar(`${props.ruta}?desde=${d}&hasta=${h}`, sesion.token, `cierres-${d}-a-${h}.xlsx`))) return
+    if (!(await descargar(`${props.ruta}?desde=${d}&hasta=${h}`, sesion.token, `${props.nombre}-${d}-a-${h}.xlsx`))) return
     dialogo.avisar('Excel descargado')
     emit('cerrar')
   } catch (e) {
@@ -65,7 +81,7 @@ const opciones = [
 
 <template>
   <HojaInferior :abierta="abierta" titulo="Descargar en Excel" @cerrar="emit('cerrar')" @enviar="bajar">
-    <p class="suave">Un día por fila, con la base, el efectivo, la plata que sacó de la caja, el Nequi y los otros pagos.</p>
+    <p class="suave">{{ descripcion }}</p>
     <div class="opciones" role="radiogroup" aria-label="Qué días">
       <label v-for="o in opciones" :key="o.valor" class="opcion" :class="{ activa: opcion === o.valor }">
         <input v-model="opcion" type="radio" name="periodo" :value="o.valor" />

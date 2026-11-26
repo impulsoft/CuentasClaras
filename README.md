@@ -69,6 +69,12 @@ El botón "atrás" del celular lo maneja `src/main.ts` con `@capacitor/app`: vue
 
 **Actividad de los negocios** (panel del admin): la API devuelve en cada negocio el último día registrado (cierre o "No abrió", sin contar lo cargado del cuaderno o de Excel) y la última vez que la app se conectó (`personal_access_tokens.last_used_at`). El panel muestra "Necesitan ayuda" con los que llevan 3 días o más sin cierre, con botones para llamar o escribir por WhatsApp al dueño.
 
+**Cobros y retiros** (panel del admin): la lista "Por vencer" muestra los negocios a los que les faltan 5 días o menos, con un WhatsApp de cobro ya escrito (fecha y valor) y "Ya pagó"; los vencidos también tienen ese WhatsApp. En el detalle de un negocio, un pago registrado por error se anula con su motivo (no se borra, queda tachado y el vencimiento se recalcula con los pagos que quedan). "Retirar negocio" es para cuando el dueño pide cancelar el servicio y borrar su información (Ley 1581): primero ofrece el Excel y luego pide escribir el nombre del negocio (sin importar mayúsculas ni tildes).
+
+**Lo recaudado y filtro de negocios** (panel del admin): el cuadro "Recaudado este mes" abre la pantalla "Lo recaudado", con los últimos 12 meses (sin los pagos anulados), el promedio mensual y el Excel de los pagos de la suscripción (un pago por fila; los anulados van con su motivo y sin valor, para que la suma dé lo recaudado). La lista de negocios se filtra por Al día, Por vencer, Vencidos, Bloqueados y Desactivados; las cifras de arriba se cuentan igual que el filtro, y los desactivados o retirados no cuentan como vencidos.
+
+**Pagos por mes** (detalle de un negocio): una cuadrícula con los 12 meses del año, como el calendario del dueño pero por meses. Cada pago cuenta en el mes en que se pagó (igual que "Lo recaudado"): verde con el valor si pagó; "Al día" si no pagó ese mes pero un pago anterior lo cubría; rojo "Sin pagar" si ningún pago lo cubrió (en el mes actual, si ya venció); gris antes de ser cliente. Al tocar un mes se ven sus pagos con "Anular"; la lista completa de pagos queda plegada debajo. La lógica está en `mesesDePagos` (`src/admin.ts`).
+
 "Tomar foto" abre la app de cámara del celular y la foto vuelve a la app; no hace falta el permiso de cámara en el `AndroidManifest.xml` (si se agrega y el dueño no lo acepta, Android bloquea la cámara).
 
 La APK de prueba se probó en un emulador con Android 7.0 (WebView Chrome 69, sin actualizar): entrar, sincronizar, calendario, cierre, gráficas, "Tomar foto", "Subir pantallazo", descartar la foto, descargar el Excel, nuevo fiado y abono. Para revisar la pantalla del WebView desde el PC: `adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>` y abrir `chrome://inspect`.
@@ -130,11 +136,15 @@ php artisan serve
 | `POST /api/excel/leer` | Dueño con términos aceptados | Lee el Excel (campo `archivo`) y devuelve cada fila con sus errores, sin guardar nada (RF-27, RF-29, RN-08) |
 | `POST /api/cuaderno` | Dueño con términos aceptados | Lee la foto de una página del cuaderno (campo `foto`) y devuelve los días con su total; la foto no se guarda (RF-28, RN-43) |
 | `GET /api/admin/resumen` | Admin | Negocios al día, por vencer y vencidos, y lo recaudado en el mes (RF-13) |
+| `GET /api/admin/recaudo?meses=12` | Admin | Lo recaudado mes a mes (sin anulados), del más viejo al actual, con los meses sin pagos en 0 |
+| `GET /api/admin/recaudo/excel?desde=&hasta=` | Admin | Excel de los pagos de la suscripción de todos los negocios |
 | `GET /api/admin/negocios` | Admin | Lista de negocios con su suscripción y lo que les deben, sin nombres de deudores (RF-06, RF-08, RF-44) |
 | `POST /api/admin/negocios` | Admin | Registrar negocio, dueño y primer pago (RF-04) |
 | `GET /api/admin/negocios/{id}` | Admin | Detalle con el historial de pagos (RF-08, RF-09) |
 | `PUT /api/admin/negocios/{id}` | Admin | Corregir datos del negocio y del dueño (RF-05) |
 | `POST /api/admin/negocios/{id}/pagos` | Admin | Registrar un pago: extiende el vencimiento (RN-12) y desbloquea (RF-12) |
+| `POST /api/admin/negocios/{id}/pagos/{pago}/anular` | Admin | Anular un pago registrado por error, con `motivo`. No se borra: deja de contar para el vencimiento (se recalcula) y para lo recaudado |
+| `POST /api/admin/negocios/{id}/retirar` | Admin | A pedido del dueño: borra sus datos como el borrado de los 6 meses, desactiva la cuenta y cierra sus sesiones. Pide `confirmacion` con el nombre del negocio. Queda el historial de pagos de la suscripción |
 | `POST /api/admin/negocios/{id}/bloquear` · `/desbloquear` | Admin | Bloquear o desbloquear el negocio (RF-12) |
 | `POST /api/admin/negocios/{id}/desactivar` · `/activar` | Admin | Desactivar o activar la cuenta del dueño (RF-05, RN-16) |
 | `POST /api/admin/negocios/{id}/contrasena` | Admin | Crear una contraseña temporal para el dueño (RF-46) |

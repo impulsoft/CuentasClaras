@@ -13,6 +13,7 @@ use App\Support\ResumenDeudas;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -42,7 +43,7 @@ class NegocioController extends Controller
         $negocios = Negocio::with('dueno')->orderBy('nombre')->get();
         $ids = $negocios->modelKeys();
         $deudas = ResumenDeudas::deVarios($ids);
-        $ultimosValores = PagoSuscripcion::whereIn('negocio_id', $ids)
+        $ultimosValores = PagoSuscripcion::whereIn('negocio_id', $ids)->vigentes()
             ->orderByDesc('fecha')->orderByDesc('id')
             ->get(['negocio_id', 'valor'])
             ->unique('negocio_id')
@@ -95,7 +96,7 @@ class NegocioController extends Controller
             'por_vencer' => $cuenta('por_vencer'),
             'vencidos' => $cuenta('vencida') + $cuenta('sin_pago'),
             'bloqueados' => $negocios->filter->estaBloqueado()->count(),
-            'recaudado_mes' => (int) PagoSuscripcion::whereBetween('fecha', [today()->startOfMonth()->toDateString(), today()->endOfMonth()->toDateString()])->sum('valor'),
+            'recaudado_mes' => (int) PagoSuscripcion::vigentes()->whereBetween('fecha', [today()->startOfMonth()->toDateString(), today()->endOfMonth()->toDateString()])->sum('valor'),
         ];
     }
 
@@ -111,8 +112,50 @@ class NegocioController extends Controller
                 'vencia_el' => $p->vencia_el?->toDateString(),
                 'vence_el' => $p->vence_el->toDateString(),
                 'nota' => $p->nota,
+                'anulado_en' => $p->anulado_en?->toIso8601String(),
+                'motivo_anulacion' => $p->motivo_anulacion,
             ]),
         ];
+    }
+
+    // Un pago de la suscripción registrado por error: se anula con su motivo y el vencimiento se recalcula
+    public function anularPago(Request $request, Negocio $negocio, PagoSuscripcion $pago)
+    {
+        abort_unless($pago->negocio_id === $negocio->id, 404);
+        $datos = $request->validate(['motivo' => ['required', 'string', 'max:255']], [
+            'motivo.required' => 'Escriba por qué se anula el pago.',
+            'motivo.max' => 'El motivo es demasiado largo.',
+        ]);
+        abort_if($pago->anulado_en !== null, 422, 'Este pago ya estaba anulado.');
+
+        $negocio->anularPago($pago, $datos['motivo'], $request->user()->id);
+
+        return $this->show($negocio->refresh());
+    }
+
+    /*
+     * El dueño pidió cancelar el servicio y borrar su información (Ley 1581, habeas data). Para
+     * evitar errores, el admin escribe el nombre del negocio. Se borran los datos y se desactiva la
+     * cuenta; queda el historial de pagos de la suscripción. No se puede deshacer.
+     */
+    public function retirar(Request $request, Negocio $negocio)
+    {
+        $datos = $request->validate(['confirmacion' => ['required', 'string', 'max:100']], [
+            'confirmacion.required' => 'Escriba el nombre del negocio para confirmar.',
+        ]);
+        // Sin importar mayúsculas, tildes ni espacios de más: "fruteria don luis" vale por "Frutería Don Luis"
+        $normalizar = fn (string $texto) => mb_strtolower(trim(preg_replace('/\s+/', ' ', Str::ascii($texto))));
+        if ($normalizar($datos['confirmacion']) !== $normalizar($negocio->nombre)) {
+            return response()->json([
+                'message' => 'El nombre no coincide. Escríbalo tal como aparece arriba.',
+                'errors' => ['confirmacion' => ['El nombre no coincide. Escríbalo tal como aparece arriba.']],
+            ], 422);
+        }
+        abort_if($negocio->datos_borrados_en !== null, 422, 'Los datos de este negocio ya se habían borrado.');
+
+        $negocio->retirar();
+
+        return $this->show($negocio->refresh());
     }
 
     // RF-04: el admin registra al dueño, su negocio y el primer pago (una cuenta y un negocio, RN-09)
@@ -296,7 +339,7 @@ class NegocioController extends Controller
             ],
             'datos_se_borran_el' => $negocio->datosSeBorranEl(),
             'datos_borrados_en' => $negocio->datos_borrados_en?->toIso8601String(),
-            'ultimo_valor' => $ultimoValor ?? (int) ($negocio->pagosSuscripcion()->value('valor') ?? 0),
+            'ultimo_valor' => $ultimoValor ?? (int) ($negocio->pagosSuscripcion()->vigentes()->value('valor') ?? 0),
             'deudas' => $deudas ?? ResumenDeudas::deNegocio($negocio->id),
             'actividad' => $actividad ?? $this->actividadDe([$negocio->id])[$negocio->id],
             'dueno' => $negocio->dueno ? [

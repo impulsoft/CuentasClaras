@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 #[Fillable(['nombre', 'telefono', 'estado', 'suscripcion_inicio_el', 'suscripcion_vence_el', 'bloqueado_en', 'datos_borrados_en'])]
 class Negocio extends Model
@@ -98,6 +99,81 @@ class Negocio extends Model
             ]);
 
             return $pago;
+        });
+    }
+
+    /**
+     * Un pago registrado por error se anula con su motivo (no se borra) y el vencimiento se vuelve
+     * a calcular con los pagos que quedan. No bloquea el negocio aunque quede vencido: eso lo
+     * decide el admin, como siempre (RF-11).
+     */
+    public function anularPago(PagoSuscripcion $pago, string $motivo, ?int $adminId): void
+    {
+        DB::transaction(function () use ($pago, $motivo, $adminId) {
+            $pago->update(['anulado_en' => now(), 'motivo_anulacion' => $motivo, 'anulado_por' => $adminId]);
+            $this->recalcularSuscripcion();
+        });
+    }
+
+    /*
+     * Vuelve a aplicar RN-12 pago por pago, del más antiguo al más nuevo, solo con los vigentes:
+     * si estaba al día, el mes corre desde el vencimiento anterior; si no, desde el día del pago.
+     */
+    public function recalcularSuscripcion(): void
+    {
+        $orden = fn () => $this->pagosSuscripcion()->getQuery()->reorder()->orderBy('fecha')->orderBy('id');
+        // Se parte de cómo estaba antes del primer pago registrado (lo normal es "sin vencimiento")
+        $inicial = $orden()->first()?->vencia_el;
+        $vence = $inicial?->copy();
+        $pagos = $orden()->vigentes()->get();
+        foreach ($pagos as $pago) {
+            $desde = $vence && $vence->greaterThanOrEqualTo($pago->fecha) ? $vence->copy() : $pago->fecha->copy();
+            $nuevo = $desde->copy()->addMonthNoOverflow();
+            $pago->update(['vencia_el' => $vence?->toDateString(), 'vence_el' => $nuevo->toDateString()]);
+            $vence = $nuevo;
+        }
+
+        $this->update([
+            'suscripcion_inicio_el' => $inicial ? $this->suscripcion_inicio_el : ($pagos->first()?->fecha ?? $this->suscripcion_inicio_el),
+            'suscripcion_vence_el' => $vence?->toDateString(),
+        ]);
+    }
+
+    /**
+     * RN-34 / RN-16: borra de forma definitiva los datos del negocio: cierres, pagos del día,
+     * fotos de comprobantes, fiados, abonos y deudores. Se conservan el negocio, la cuenta del
+     * dueño y el historial de pagos de la suscripción (contabilidad del servicio).
+     * Lo usan el borrado automático (routes/console.php) y el retiro a pedido del dueño.
+     */
+    public function borrarDatos(): void
+    {
+        DB::transaction(function () {
+            $delNegocio = fn (string $modelo) => $modelo::withoutGlobalScopes()->where('negocio_id', $this->id);
+            $fotos = $delNegocio(Pago::class)->whereNotNull('foto_ruta')->pluck('foto_ruta');
+
+            $delNegocio(Abono::class)->delete();
+            $delNegocio(Fiado::class)->delete();
+            $delNegocio(Deudor::class)->delete();
+            $delNegocio(Pago::class)->delete();
+            $delNegocio(Cierre::class)->delete();
+            $this->update(['datos_borrados_en' => now()]);
+
+            Storage::disk('local')->delete($fotos->all());
+            Storage::disk('local')->deleteDirectory("comprobantes/{$this->id}");
+        });
+    }
+
+    /*
+     * El dueño pidió cancelar el servicio y borrar su información (Ley 1581, habeas data): se
+     * borran los datos ya, sin esperar los 6 meses, y la cuenta queda desactivada con las
+     * sesiones cerradas en todos sus celulares.
+     */
+    public function retirar(): void
+    {
+        DB::transaction(function () {
+            $this->borrarDatos();
+            $this->dueno?->update(['activo' => false, 'desactivado_en' => now()]);
+            $this->dueno?->tokens()->delete();
         });
     }
 
