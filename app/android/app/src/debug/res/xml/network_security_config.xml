@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  APK de prueba (debug): igual que la de los dueños (src/main/res/xml), pero permite http para
+  hablar con la API del PC (http://10.0.2.2:8000 desde el emulador).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

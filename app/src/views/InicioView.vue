@@ -94,16 +94,26 @@ function cerrarDia() {
   else router.replace({ query: {} })
 }
 
-// Botón de hoy debajo del calendario: la forma más directa de hacer el cierre del día
+/*
+ * Tarjeta "Hoy", lo primero que se ve: si falta el cierre, el botón para hacerlo; si ya se hizo,
+ * lo vendido hoy. Es la forma más directa de llegar al cierre del día.
+ */
 const cierreHoy = useConsulta(() => cierreDelDia(hoy), null)
 const pagosHoy = useConsulta(() => pagosDelDia(hoy), [])
-const botonHoy = computed(() => {
+const fechaHoyTexto = (() => {
+  const texto = `${SEMANA[new Date(`${hoy}T12:00:00Z`).getUTCDay()]} ${fechaLarga(hoy)}`
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+})()
+const tarjetaHoy = computed(() => {
   const c = cierreHoy.value
-  if (c && !c.no_abrio) return { texto: 'Ver el cierre de hoy', detalle: pesos(totalesDelDia(c, pagosHoy.value).total), primario: false }
-  if (c?.no_abrio) return { texto: 'Ver hoy', detalle: 'No abrió', primario: false }
-  if (sync.soloConsulta) return { texto: 'Ver hoy', detalle: '', primario: false }
-  return { texto: 'Hacer el cierre de hoy', detalle: '', primario: true }
+  if (c && !c.no_abrio) return { titulo: 'Vendido hoy', valor: pesos(totalesDelDia(c, pagosHoy.value).total), boton: 'Ver el cierre', primario: false }
+  if (c?.no_abrio) return { titulo: 'Hoy no abrió', valor: null, boton: 'Ver hoy', primario: false }
+  if (sync.soloConsulta) return { titulo: 'Hoy', valor: null, boton: 'Ver hoy', primario: false }
+  return { titulo: 'Falta el cierre de hoy', valor: null, boton: 'Hacer el cierre', primario: true }
 })
+
+// Cifras del mes que se está viendo en el calendario
+const promedioDia = computed(() => (diasCerrados.value ? Math.round(totalMes.value / diasCerrados.value) : null))
 </script>
 
 <template>
@@ -128,27 +138,36 @@ const botonHoy = computed(() => {
       <!-- RF-18: fotos de comprobantes que faltan por leer o confirmar -->
       <ComprobantesPorRevisar />
 
-      <!-- Lo primero que se ve: la forma más directa de hacer el cierre del día -->
-      <button type="button" class="boton hoy-boton" :class="{ secundario: !botonHoy.primario }" @click="abrirDia(hoy)">
-        <component :is="botonHoy.primario ? IconCashRegister : IconCalendarCheck" :size="24" aria-hidden="true" />
-        <span class="hoy-textos">
-          <span>{{ botonHoy.texto }}</span>
-          <span v-if="botonHoy.detalle" class="hoy-detalle">{{ botonHoy.detalle }}</span>
-        </span>
-      </button>
+      <!-- Lo primero que se ve: el día de hoy y la forma más directa de hacer su cierre -->
+      <section class="tarjeta hoy" :class="{ pendiente: tarjetaHoy.primario }" aria-label="Hoy">
+        <p class="hoy-fecha">Hoy · {{ fechaHoyTexto }}</p>
+        <p class="hoy-titulo">{{ tarjetaHoy.titulo }}</p>
+        <p v-if="tarjetaHoy.valor" class="hoy-valor monto">{{ tarjetaHoy.valor }}</p>
+        <button type="button" class="boton" :class="{ secundario: !tarjetaHoy.primario }" @click="abrirDia(hoy)">
+          <component :is="tarjetaHoy.primario ? IconCashRegister : IconCalendarCheck" :size="22" aria-hidden="true" />
+          {{ tarjetaHoy.boton }}
+        </button>
+      </section>
 
-      <section class="tarjeta">
+      <!-- Cifras del mes que se ve en el calendario -->
+      <section class="cifras" aria-label="Resumen del mes">
+        <div class="cifra">
+          <span class="cifra-nombre">Vendido en {{ nombreMes(mes) }}</span>
+          <strong class="cifra-valor monto">{{ pesos(totalMes) }}</strong>
+          <span class="cifra-nota">{{ diasCerrados }} {{ diasCerrados === 1 ? 'día cerrado' : 'días cerrados' }}</span>
+        </div>
+        <div class="cifra">
+          <span class="cifra-nombre">Promedio por día</span>
+          <strong class="cifra-valor monto">{{ promedioDia === null ? '–' : pesos(promedioDia) }}</strong>
+          <span class="cifra-nota">de los días cerrados</span>
+        </div>
+      </section>
+
+      <section class="tarjeta calendario-tarjeta">
         <nav class="mes" aria-label="Cambiar de mes">
-          <button class="flecha" aria-label="Mes anterior" @click="cambiarMes(-1)"><IconChevronLeft :size="26" /></button>
-          <div class="mes-textos">
-            <h2>{{ titulo }}</h2>
-            <p class="total-mes">
-              <span class="suave">Total del mes</span>
-              <strong class="monto">{{ pesos(totalMes) }}</strong>
-            </p>
-            <p class="suave pequeno">{{ diasCerrados }} {{ diasCerrados === 1 ? 'día cerrado' : 'días cerrados' }}</p>
-          </div>
-          <button class="flecha" aria-label="Mes siguiente" @click="cambiarMes(1)"><IconChevronRight :size="26" /></button>
+          <button class="flecha" aria-label="Mes anterior" @click="cambiarMes(-1)"><IconChevronLeft :size="22" /></button>
+          <h2>{{ titulo }}</h2>
+          <button class="flecha" aria-label="Mes siguiente" @click="cambiarMes(1)"><IconChevronRight :size="22" /></button>
         </nav>
 
         <CalendarioMes
@@ -180,53 +199,108 @@ const botonHoy = computed(() => {
 </template>
 
 <style scoped>
+/* ---------- Tarjeta "Hoy" ---------- */
+.hoy {
+  gap: 4px;
+}
+
+.hoy-fecha {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+
+.hoy-titulo {
+  font-size: 1.2rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.hoy-valor {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.hoy .boton {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* Falta el cierre: una franja verde a la izquierda llama la atención sin gritar */
+.hoy.pendiente {
+  box-shadow: inset 4px 0 0 var(--verde-600), var(--sombra-1);
+}
+
+/* ---------- Cifras del mes ---------- */
+.cifras {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cifra {
+  display: grid;
+  gap: 2px;
+  padding: 14px 14px 12px;
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-1);
+}
+
+.cifra-nombre {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+
+.cifra-nombre::first-letter {
+  text-transform: uppercase;
+}
+
+.cifra-valor {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.cifra-nota {
+  font-size: 0.75rem;
+  color: var(--texto-tenue);
+}
+
+/* ---------- Calendario ---------- */
 .mes {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
-}
-
-.mes-textos {
-  text-align: center;
-  display: grid;
-  gap: 2px;
 }
 
 .mes h2 {
+  font-size: 1.05rem;
   text-transform: capitalize;
 }
 
-.total-mes {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0 8px;
-}
-
-.total-mes strong {
-  font-size: 1.3rem;
-  color: var(--verde-700);
-}
-
 .flecha {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   flex: none;
   display: grid;
   place-items: center;
-  color: var(--verde-800);
-  background: var(--verde-50);
-  border: none;
-  border-radius: 14px;
+  color: var(--texto-suave);
+  background: none;
+  border: 1px solid var(--linea);
+  border-radius: 12px;
   cursor: pointer;
   transition-property: background-color, transform;
   transition-duration: 150ms;
 }
 
 .flecha:hover {
-  background: var(--verde-200);
+  background: var(--superficie-suave);
 }
 
 .flecha:active {
@@ -235,23 +309,5 @@ const botonHoy = computed(() => {
 
 .pista {
   text-align: center;
-}
-
-/* Botón de hoy: texto y valor dentro de un span (un <button> no puede ser flex en Android 7, RNF-03) */
-.hoy-boton {
-  width: 100%;
-}
-
-.hoy-textos {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.2;
-}
-
-.hoy-detalle {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--texto-suave);
 }
 </style>

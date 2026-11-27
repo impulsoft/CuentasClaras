@@ -126,14 +126,14 @@ const alto = (valor: number) => (maximo.value > 0 ? Math.max((valor / maximo.val
   display: block;
   max-width: 40px;
   margin: 0 auto;
-  background: var(--verde-600);
-  border-radius: 4px 4px 0 0;
+  background: #5dcaa5;
+  border-radius: 3px 3px 0 0;
   transition-property: background-color;
   transition-duration: 150ms;
 }
 
 .columna.activa .relleno {
-  background: var(--verde-900);
+  background: var(--verde-700);
 }
 
 /* Centrada sobre la barra sin "translate" (RNF-03) */

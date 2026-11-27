@@ -27,9 +27,10 @@ function volver() {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: var(--verde-700);
-  color: #ffffff;
-  padding: 10px 16px;
+  background: var(--superficie);
+  color: var(--texto);
+  border-bottom: 1px solid var(--linea);
+  padding: 8px 16px;
   padding-top: max(10px, env(safe-area-inset-top));
 }
 
@@ -48,17 +49,17 @@ function volver() {
   margin-left: -8px;
   display: grid;
   place-items: center;
-  color: #ffffff;
+  color: var(--texto);
   background: none;
   border: none;
-  border-radius: 14px;
+  border-radius: 12px;
   cursor: pointer;
   transition-property: background-color, transform;
   transition-duration: 150ms;
 }
 
 .volver:hover {
-  background: rgb(255 255 255 / 0.12);
+  background: var(--superficie-suave);
 }
 
 .volver:active {
@@ -67,7 +68,9 @@ function volver() {
 
 h1 {
   min-width: 0;
-  font-size: 1.25rem;
+  font-size: 1.12rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

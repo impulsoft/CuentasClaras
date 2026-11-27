@@ -17,6 +17,8 @@ fi
 # Solo el contenedor de la API actualiza la base de datos (el programador espera a que esté lista)
 if [ "${CIERRE_MIGRAR:-1}" = "1" ]; then
   php artisan migrate --force
+  # Crea la cuenta del admin si todavía no existe (si ya existe, no le cambia la contraseña)
+  php artisan cierre:admin
 fi
 
 php artisan config:cache

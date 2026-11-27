@@ -1,4 +1,4 @@
-package co.cierredecaja.app;
+package online.impulsoft.cuentasclaras;
 
 import com.getcapacitor.BridgeActivity;
 

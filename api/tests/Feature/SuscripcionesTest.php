@@ -92,6 +92,30 @@ class SuscripcionesTest extends TestCase
         $respuesta->assertJsonPath('suscripcion.inicio_el', '2026-11-18')->assertJsonPath('suscripcion.vence_el', '2026-12-18');
     }
 
+    public function test_el_admin_puede_dejar_el_primer_mes_gratis(): void
+    {
+        $datos = [
+            'nombre_negocio' => 'Tienda Nueva', 'nombre_dueno' => 'Ana', 'telefono' => '3001112233',
+            'usuario' => 'tienda.nueva', 'contrasena' => 'clave-segura-1',
+        ];
+
+        // Sin valor y sin marcar el mes gratis, falta el valor
+        $this->postJson('/api/admin/negocios', $datos)->assertUnprocessable()
+            ->assertJsonPath('errors.valor_pago.0', 'Escriba el valor que pagó, o marque que el primer mes es gratis.');
+
+        $respuesta = $this->postJson('/api/admin/negocios', $datos + ['primer_mes_gratis' => true])->assertCreated()
+            ->assertJsonPath('suscripcion.vence_el', '2026-12-18') // el mes corre igual
+            ->assertJsonPath('ultimo_valor', 0);
+        $this->getJson('/api/admin/negocios/'.$respuesta->json('id'))
+            ->assertJsonPath('pagos.0.valor', 0)
+            ->assertJsonPath('pagos.0.nota', 'Primer mes gratis');
+
+        // No suma en lo recaudado ni cuenta como un pago; el primer pago de verdad sí
+        $this->getJson('/api/admin/recaudo?meses=1')->assertJsonPath('meses.0', ['mes' => '2026-11', 'total' => 0, 'pagos' => 0]);
+        $this->postJson('/api/admin/negocios/'.$respuesta->json('id').'/pagos', ['valor' => 30000])
+            ->assertJsonPath('suscripcion.vence_el', '2027-01-18')->assertJsonPath('ultimo_valor', 30000);
+    }
+
     public function test_bloquear_deja_al_dueno_en_solo_consulta_pero_lo_registrado_sin_internet_entra(): void
     {
         $this->postJson("/api/admin/negocios/{$this->negocio->id}/bloquear")->assertOk()->assertJsonPath('estado', 'bloqueado');

@@ -30,6 +30,7 @@ class NegocioController extends Controller
         'usuario.unique' => 'Ese usuario ya existe. Escoja otro.',
         'contrasena.min' => 'La contraseña debe tener al menos 8 caracteres.',
         'valor_pago.min' => 'Escriba el valor que pagó.',
+        'valor_pago.required' => 'Escriba el valor que pagó, o marque que el primer mes es gratis.',
         'valor.min' => 'Escriba el valor que pagó.',
         'fecha_pago.before_or_equal' => 'La fecha del pago no puede ser un día que no ha llegado.',
         'fecha.before_or_equal' => 'La fecha del pago no puede ser un día que no ha llegado.',
@@ -40,10 +41,10 @@ class NegocioController extends Controller
     // La misma cantidad de consultas con 3 negocios o con 3.000 (RNF-08)
     public function index()
     {
-        $negocios = Negocio::with('dueno')->orderBy('nombre')->get();
+        $negocios = Negocio::with('dueno', 'cuentas')->orderBy('nombre')->get();
         $ids = $negocios->modelKeys();
         $deudas = ResumenDeudas::deVarios($ids);
-        $ultimosValores = PagoSuscripcion::whereIn('negocio_id', $ids)->vigentes()
+        $ultimosValores = PagoSuscripcion::whereIn('negocio_id', $ids)->vigentes()->where('valor', '>', 0)
             ->orderByDesc('fecha')->orderByDesc('id')
             ->get(['negocio_id', 'valor'])
             ->unique('negocio_id')
@@ -102,9 +103,11 @@ class NegocioController extends Controller
 
     public function show(Negocio $negocio)
     {
-        $negocio->load('dueno', 'pagosSuscripcion');
+        $negocio->load('dueno', 'cuentas', 'pagosSuscripcion');
 
         return $this->datos($negocio) + [
+            // Todas las cuentas del negocio, con su estado y su última conexión
+            'usuarios' => UsuarioController::filas($negocio->cuentas, request()->user()),
             'pagos' => $negocio->pagosSuscripcion->map(fn (PagoSuscripcion $p) => [
                 'id' => $p->id,
                 'fecha' => $p->fecha->toDateString(),
@@ -158,7 +161,7 @@ class NegocioController extends Controller
         return $this->show($negocio->refresh());
     }
 
-    // RF-04: el admin registra al dueño, su negocio y el primer pago (una cuenta y un negocio, RN-09)
+    // RF-04: el admin registra al dueño, su negocio y el primer pago. Después le puede agregar más cuentas (UsuarioController)
     public function store(Request $request)
     {
         $datos = $request->validate([
@@ -167,11 +170,14 @@ class NegocioController extends Controller
             'telefono' => ['required', 'regex:/^\d{7,15}$/'],
             'usuario' => ['required', 'regex:/^[a-z0-9._-]+$/i', 'min:4', 'max:50', 'unique:users,usuario'],
             'contrasena' => ['required', 'string', 'min:8', 'max:100'],
-            'valor_pago' => ['required', 'integer', 'min:1', 'max:999999999'],
+            // El admin decide si el primer mes es gratis: entonces no paga nada ahora
+            'primer_mes_gratis' => ['sometimes', 'boolean'],
+            'valor_pago' => ['exclude_if:primer_mes_gratis,true', 'required', 'integer', 'min:1', 'max:999999999'],
             'fecha_pago' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
         ], self::MENSAJES);
+        $gratis = (bool) ($datos['primer_mes_gratis'] ?? false);
 
-        $negocio = DB::transaction(function () use ($datos, $request) {
+        $negocio = DB::transaction(function () use ($datos, $request, $gratis) {
             $negocio = Negocio::create([
                 'nombre' => $datos['nombre_negocio'],
                 'telefono' => $datos['telefono'],
@@ -187,28 +193,41 @@ class NegocioController extends Controller
                 'password' => $datos['contrasena'],
             ]);
 
-            $negocio->registrarPago($this->fecha($datos['fecha_pago'] ?? null), $datos['valor_pago'], 'Primer mes', $request->user()->id);
+            // El mes gratis queda como un pago de $0: el vencimiento se calcula igual y en el historial se ve
+            $negocio->registrarPago(
+                $this->fecha($datos['fecha_pago'] ?? null),
+                $gratis ? 0 : $datos['valor_pago'],
+                $gratis ? 'Primer mes gratis' : 'Primer mes',
+                $request->user()->id,
+            );
 
             return $negocio;
         });
 
-        return response()->json($this->datos($negocio->load('dueno')), 201);
+        return response()->json($this->datos($negocio->load('dueno', 'cuentas')), 201);
     }
 
-    // RF-05: corregir los datos del negocio y del dueño
+    // RF-05: corregir los datos del negocio. Los de cada persona se corrigen en su cuenta
+    // (UsuarioController); nombre_dueno y usuario siguen sirviendo para la cuenta principal.
     public function update(Request $request, Negocio $negocio)
     {
         $dueno = $negocio->dueno;
         $datos = $request->validate([
             'nombre_negocio' => ['required', 'string', 'max:100'],
-            'nombre_dueno' => ['required', 'string', 'max:100'],
+            'nombre_dueno' => ['sometimes', 'required', 'string', 'max:100'],
             'telefono' => ['required', 'regex:/^\d{7,15}$/'],
-            'usuario' => ['required', 'regex:/^[a-z0-9._-]+$/i', 'min:4', 'max:50', Rule::unique('users', 'usuario')->ignore($dueno?->id)],
+            'usuario' => ['sometimes', 'required', 'regex:/^[a-z0-9._-]+$/i', 'min:4', 'max:50', Rule::unique('users', 'usuario')->ignore($dueno?->id)],
         ], self::MENSAJES);
 
         DB::transaction(function () use ($negocio, $dueno, $datos) {
             $negocio->update(['nombre' => $datos['nombre_negocio'], 'telefono' => $datos['telefono']]);
-            $dueno?->update(['nombre' => $datos['nombre_dueno'], 'usuario' => $datos['usuario'], 'telefono' => $datos['telefono']]);
+            if (isset($datos['nombre_dueno']) || isset($datos['usuario'])) {
+                $dueno?->update(array_filter([
+                    'nombre' => $datos['nombre_dueno'] ?? null,
+                    'usuario' => $datos['usuario'] ?? null,
+                    'telefono' => $datos['telefono'],
+                ]));
+            }
         });
 
         return $this->show($negocio->refresh());
@@ -243,18 +262,18 @@ class NegocioController extends Controller
         return $this->show($negocio->refresh());
     }
 
-    // RF-05 / RN-16: un dueño desactivado no puede entrar; su historial se conserva (RN-34)
+    // RF-05 / RN-16: nadie del negocio puede entrar; su historial se conserva (RN-34).
+    // Para una sola cuenta: /admin/usuarios/{id}/desactivar
     public function desactivar(Negocio $negocio)
     {
-        $negocio->dueno?->update(['activo' => false, 'desactivado_en' => now()]);
-        $negocio->dueno?->tokens()->delete();
+        $negocio->desactivarCuentas();
 
         return $this->show($negocio->refresh());
     }
 
     public function activar(Negocio $negocio)
     {
-        $negocio->dueno?->update(['activo' => true, 'desactivado_en' => null]);
+        $negocio->cuentas()->update(['activo' => true, 'desactivado_en' => null]);
 
         return $this->show($negocio->refresh());
     }
@@ -339,9 +358,14 @@ class NegocioController extends Controller
             ],
             'datos_se_borran_el' => $negocio->datosSeBorranEl(),
             'datos_borrados_en' => $negocio->datos_borrados_en?->toIso8601String(),
-            'ultimo_valor' => $ultimoValor ?? (int) ($negocio->pagosSuscripcion()->vigentes()->value('valor') ?? 0),
+            'ultimo_valor' => $ultimoValor ?? (int) ($negocio->pagosSuscripcion()->vigentes()->where('valor', '>', 0)->value('valor') ?? 0),
             'deudas' => $deudas ?? ResumenDeudas::deNegocio($negocio->id),
             'actividad' => $actividad ?? $this->actividadDe([$negocio->id])[$negocio->id],
+            // Cuántas cuentas tiene y cuántas pueden entrar (ninguna = negocio desactivado)
+            'cuentas' => [
+                'total' => $negocio->cuentas->count(),
+                'activas' => $negocio->cuentas->where('activo', true)->count(),
+            ],
             'dueno' => $negocio->dueno ? [
                 'nombre' => $negocio->dueno->nombre,
                 'usuario' => $negocio->dueno->usuario,

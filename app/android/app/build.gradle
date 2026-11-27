@@ -10,10 +10,10 @@ if (archivoFirma.exists()) {
 }
 
 android {
-    namespace = "co.cierredecaja.app"
+    namespace = "online.impulsoft.cuentasclaras"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "co.cierredecaja.app"
+        applicationId "online.impulsoft.cuentasclaras"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

@@ -9,18 +9,18 @@ const deudores = useDeudoresStore()
 <template>
   <nav class="navegacion" aria-label="Secciones">
     <RouterLink :to="{ name: 'inicio' }" class="pestana" active-class="" exact-active-class="activa">
-      <IconCalendarEvent :size="26" aria-hidden="true" />
+      <IconCalendarEvent :size="24" aria-hidden="true" />
       <span>Caja</span>
     </RouterLink>
     <RouterLink :to="{ name: 'deudores' }" class="pestana" active-class="activa">
       <span class="icono">
-        <IconUsers :size="26" aria-hidden="true" />
+        <IconUsers :size="24" aria-hidden="true" />
         <span v-if="deudores.totales.vencidas" class="globo">{{ deudores.totales.vencidas }}</span>
       </span>
       <span>Deudores<span v-if="deudores.totales.vencidas" class="oculto"> ({{ deudores.totales.vencidas }} vencidos)</span></span>
     </RouterLink>
     <RouterLink :to="{ name: 'analisis' }" class="pestana" active-class="activa">
-      <IconChartBar :size="26" aria-hidden="true" />
+      <IconChartBar :size="24" aria-hidden="true" />
       <span>Análisis</span>
     </RouterLink>
   </nav>
@@ -34,21 +34,21 @@ const deudores = useDeudoresStore()
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
-  padding: 8px 12px;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
-  background: rgb(255 255 255 / 0.96);
-  box-shadow: 0 -1px 0 var(--linea), 0 -8px 24px rgb(16 32 26 / 0.06);
+  padding: 6px 12px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  background: var(--superficie);
+  border-top: 1px solid var(--linea);
 }
 
 .pestana {
   display: grid;
   justify-items: center;
   gap: 2px;
-  min-height: 60px;
+  min-height: 56px;
   padding: 6px;
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: var(--texto-suave);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--texto-tenue);
   text-decoration: none;
   border-radius: var(--radio-control);
   transition-property: background-color, color;
@@ -56,8 +56,24 @@ const deudores = useDeudoresStore()
 }
 
 .pestana.activa {
-  color: var(--verde-800);
-  background: var(--verde-50);
+  color: var(--verde-700);
+}
+
+/* Rayita arriba del ícono activo */
+.pestana {
+  position: relative;
+}
+
+.pestana.activa::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 28px;
+  height: 3px;
+  margin-left: -14px;
+  border-radius: 0 0 3px 3px;
+  background: var(--verde-700);
 }
 
 .icono {
@@ -75,7 +91,7 @@ const deudores = useDeudoresStore()
   display: grid;
   place-items: center;
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #ffffff;
   background: var(--error);

@@ -37,6 +37,15 @@ function detalle(d: ResumenDeudor): string {
   if (!d.pagaEl) return fio
   return `${fio} · ${textoPlazo(d.pagaEl, d.estado === 'vencido', hoy)}`
 }
+
+// Iniciales para el círculo de cada persona: "Carlos Pérez" → "CP"
+const iniciales = (nombre: string) =>
+  nombre
+    .split(' ')
+    .filter((p) => /^[a-záéíóúñ]/i.test(p))
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join('')
 </script>
 
 <template>
@@ -80,6 +89,7 @@ function detalle(d: ResumenDeudor): string {
         <ul class="lista">
           <li v-for="d in visibles" :key="d.deudor.id">
             <RouterLink :to="{ name: 'deudor', params: { id: d.deudor.id } }" class="deudor" :class="d.estado">
+              <span class="avatar" aria-hidden="true">{{ iniciales(d.nombre) }}</span>
               <span class="izquierda">
                 <strong class="nombre">{{ d.nombre }}</strong>
                 <span class="suave pequeno">{{ detalle(d) }}</span>
@@ -113,29 +123,31 @@ function detalle(d: ResumenDeudor): string {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
 }
 
 .encabezado h2 {
-  font-size: 1.45rem;
+  margin-right: 12px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .encabezado .boton {
-  min-height: 50px;
+  min-height: 48px;
   padding: 10px 16px;
   text-decoration: none;
 }
 
+/* Total por cobrar: la cifra grande, como un saldo */
 .total {
   gap: 2px;
-  background: var(--verde-50);
-  box-shadow: none;
 }
 
 .total strong {
   font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   line-height: 1.15;
-  color: var(--verde-800);
 }
 
 .buscar input {
@@ -151,46 +163,72 @@ function detalle(d: ResumenDeudor): string {
   white-space: nowrap;
 }
 
+/* Una sola tarjeta con renglones (como la lista de movimientos de un banco) */
 .lista {
   list-style: none;
   margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 10px;
+  padding: 0 0 0 14px;
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-1);
+  overflow: hidden;
 }
 
+.lista li + li .deudor {
+  border-top: 1px solid var(--linea);
+}
+
+/* Sin "gap" en flex (Android 7): la separación va con márgenes */
 .deudor {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 10px 14px 16px;
+  min-height: 72px;
+  padding: 12px 10px 12px 0;
   color: inherit;
   text-decoration: none;
-  background: var(--superficie);
-  border-radius: 16px;
-  box-shadow: var(--sombra-1);
-  border-left: 5px solid transparent;
-  transition-property: transform, box-shadow;
+  transition-property: background-color;
   transition-duration: 150ms;
 }
 
 .deudor:active {
-  transform: scale(0.98);
+  background: var(--superficie-suave);
 }
 
-.deudor.vencido {
-  border-left-color: var(--error);
+.avatar {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  margin-right: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--texto-suave);
+  background: var(--superficie-suave);
+  border-radius: 50%;
+}
+
+.deudor.vencido .avatar {
+  color: var(--error);
+  background: var(--error-fondo);
+}
+
+.deudor.pagado .avatar {
+  color: var(--cerrado-texto);
+  background: var(--cerrado);
 }
 
 .izquierda {
   flex: 1;
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .nombre {
-  font-size: 1.05rem;
+  font-size: 1rem;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -200,14 +238,17 @@ function detalle(d: ResumenDeudor): string {
   display: grid;
   justify-items: end;
   gap: 4px;
+  margin-left: 10px;
 }
 
 .derecha .monto {
-  font-size: 1.1rem;
+  font-size: 1.02rem;
+  font-weight: 650;
 }
 
 .flecha {
   flex: none;
+  margin-left: 4px;
   color: var(--texto-tenue);
 }
 

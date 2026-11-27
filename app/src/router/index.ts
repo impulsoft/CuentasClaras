@@ -21,6 +21,8 @@ const AdminAnalisisView = () => import('../views/AdminAnalisisView.vue')
 const AdminNegocioView = () => import('../views/AdminNegocioView.vue')
 const AdminCierresView = () => import('../views/AdminCierresView.vue')
 const AdminRecaudoView = () => import('../views/AdminRecaudoView.vue')
+const AdminUsuariosView = () => import('../views/AdminUsuariosView.vue')
+const AdminNegociosView = () => import('../views/AdminNegociosView.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -48,6 +50,8 @@ const router = createRouter({
     { path: '/contrasena', name: 'contrasena', component: ContrasenaView },
     { path: '/admin', name: 'admin', component: AdminView, meta: { rol: 'admin' } },
     { path: '/admin/recaudo', name: 'admin-recaudo', component: AdminRecaudoView, meta: { rol: 'admin' } },
+    { path: '/admin/usuarios', name: 'admin-usuarios', component: AdminUsuariosView, meta: { rol: 'admin' } },
+    { path: '/admin/negocios', name: 'admin-negocios', component: AdminNegociosView, meta: { rol: 'admin' } },
     { path: '/admin/negocios/:id', name: 'admin-negocio', component: AdminNegocioView, props: true, meta: { rol: 'admin' } },
     { path: '/admin/negocios/:id/cierres', name: 'admin-cierres', component: AdminCierresView, props: true, meta: { rol: 'admin' } },
     { path: '/admin/negocios/:id/analisis', name: 'admin-analisis', component: AdminAnalisisView, props: true, meta: { rol: 'admin' } },

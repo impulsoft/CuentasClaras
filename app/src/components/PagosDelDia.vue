@@ -231,8 +231,7 @@ async function anular(pago: Pago) {
   place-items: center;
   border-radius: 12px;
   color: var(--verde-700);
-  background: var(--superficie);
-  box-shadow: var(--sombra-1);
+  background: var(--verde-50);
 }
 
 .nombre {
@@ -317,7 +316,7 @@ async function anular(pago: Pago) {
 .detalle-valor {
   margin: 0;
   font-size: 2rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--verde-800);
 }
 
@@ -355,12 +354,12 @@ async function anular(pago: Pago) {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 52px;
+  min-height: 50px;
   font: inherit;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--verde-700);
-  background: var(--superficie);
-  border: 1.5px dashed var(--verde-600);
+  background: #f5fbf8;
+  border: 1px dashed var(--verde-200);
   border-radius: 12px;
   cursor: pointer;
   transition-property: background-color, transform;

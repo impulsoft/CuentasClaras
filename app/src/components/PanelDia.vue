@@ -131,24 +131,30 @@ async function resolver(quedarseConEste: boolean) {
 
 const totalDe = (c: Cierre) => totalesDelDia(c, pagos.value).total
 
+// La caja del día (lo que se contó). Lo vendido por cada medio va arriba, en la barra del total.
 const filasDetalle = computed(() => {
   const c = cierre.value
-  if (!c) return []
-  // RN-35: un día del cuaderno o de Excel solo trae el total y, si se conoce, el Nequi
-  if (c.tipo === 'historico') {
-    return [
-      ...(totales.value.nequi ? [{ etiqueta: 'Nequi', valor: totales.value.nequi, icono: IconDeviceMobile }] : []),
-      { etiqueta: 'Sin detalle (del cuaderno o Excel)', valor: totales.value.sinDetalle, icono: IconReceiptOff },
-    ]
-  }
+  // RN-35: un día del cuaderno o de Excel solo trae el total (y a veces el Nequi): no hay caja
+  if (!c || c.tipo === 'historico') return []
   return [
     { etiqueta: 'Base inicial', valor: c.base ?? 0, icono: IconWallet },
     { etiqueta: 'Efectivo contado', valor: c.efectivo ?? 0, icono: IconCash },
     { etiqueta: 'Plata que sacó de la caja', valor: c.salida_caja, icono: IconReceiptOff },
-    { etiqueta: 'Vendido en efectivo', valor: totales.value.efectivo, icono: IconCash },
-    { etiqueta: 'Nequi', valor: totales.value.nequi, icono: IconDeviceMobile },
-    { etiqueta: 'Otros pagos', valor: totales.value.otros, icono: IconCreditCard },
   ]
+})
+
+// Cómo se repartió lo vendido: una barra con un color por medio de pago y su leyenda
+const COLORES = { efectivo: '#1d9e75', nequi: '#7f77dd', otros: '#378add', sinDetalle: '#b4b2a9' }
+const partes = computed(() => {
+  const t = totales.value
+  const lista = [
+    { clave: 'efectivo', nombre: 'Efectivo', valor: t.efectivo, color: COLORES.efectivo, icono: IconCash },
+    { clave: 'nequi', nombre: 'Nequi', valor: t.nequi, color: COLORES.nequi, icono: IconDeviceMobile },
+    { clave: 'otros', nombre: 'Otros pagos', valor: t.otros, color: COLORES.otros, icono: IconCreditCard },
+    { clave: 'sinDetalle', nombre: 'Sin detalle', valor: t.sinDetalle, color: COLORES.sinDetalle, icono: IconReceiptOff },
+  ].filter((p) => p.valor > 0)
+  const suma = lista.reduce((s, p) => s + p.valor, 0)
+  return lista.map((p) => ({ ...p, porcentaje: suma ? (p.valor / suma) * 100 : 0 }))
 })
 </script>
 
@@ -191,16 +197,32 @@ const filasDetalle = computed(() => {
 
     <!-- Detalle del cierre (RF-15) -->
     <template v-if="tieneCierre && !mostrarFormulario">
-      <ul class="detalle">
-        <li v-for="fila in filasDetalle" :key="fila.etiqueta">
-          <component :is="fila.icono" class="icono-fila" :size="20" aria-hidden="true" />
-          <span class="suave">{{ fila.etiqueta }}</span>
-          <span class="monto">{{ pesos(fila.valor) }}</span>
-        </li>
-      </ul>
-      <div class="total">
-        <span>Total vendido</span>
-        <strong class="monto">{{ pesos(totales.total) }}</strong>
+      <!-- Lo más importante del día: el total y cómo se repartió -->
+      <div class="resumen-dia">
+        <span class="resumen-nombre">Total vendido</span>
+        <strong class="resumen-valor monto">{{ pesos(totales.total) }}</strong>
+        <div v-if="partes.length > 1" class="reparto" aria-hidden="true">
+          <span v-for="p in partes" :key="p.clave" :style="{ width: `${p.porcentaje}%`, background: p.color }" />
+        </div>
+        <ul class="reparto-leyenda">
+          <li v-for="p in partes" :key="p.clave">
+            <i class="punto" :style="{ background: p.color }" aria-hidden="true" />
+            <span class="suave">{{ p.nombre }}</span>
+            <strong class="monto">{{ pesos(p.valor) }}</strong>
+          </li>
+        </ul>
+        <p v-if="cierre!.tipo === 'historico'" class="suave pequeno">Del cuaderno o de Excel: solo se conoce el total.</p>
+      </div>
+
+      <div v-if="filasDetalle.length" class="caja">
+        <h3>Caja</h3>
+        <ul class="detalle">
+          <li v-for="fila in filasDetalle" :key="fila.etiqueta">
+            <component :is="fila.icono" class="icono-fila" :size="20" aria-hidden="true" />
+            <span class="suave">{{ fila.etiqueta }}</span>
+            <span class="monto">{{ pesos(fila.valor) }}</span>
+          </li>
+        </ul>
       </div>
       <AbonosDelDia :fecha="fecha" />
       <p v-if="cierre!.modificado_en" class="suave pequeno">
@@ -285,7 +307,7 @@ const filasDetalle = computed(() => {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  box-shadow: 0 0 0 8px var(--fondo), 0 10px 24px rgb(15 110 86 / 0.35);
+  box-shadow: 0 0 0 8px var(--fondo), 0 8px 20px rgb(15 110 86 / 0.25);
 }
 
 .cabecera {
@@ -293,6 +315,80 @@ const filasDetalle = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* ---------- Resumen del día: el total grande y el reparto por medio de pago ---------- */
+.resumen-dia,
+.caja {
+  display: grid;
+  gap: 4px;
+  padding: 18px 16px;
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-1);
+}
+
+.resumen-dia {
+  text-align: center;
+}
+
+.resumen-nombre {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+
+.resumen-valor {
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+/* Barra repartida por colores (sin "gap" en flex: Android 7) */
+.reparto {
+  display: flex;
+  height: 8px;
+  margin: 12px 0 4px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--superficie-suave);
+}
+
+.reparto span + span {
+  margin-left: 2px;
+}
+
+.reparto-leyenda {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  text-align: left;
+}
+
+.reparto-leyenda li {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  font-size: 0.95rem;
+}
+
+.reparto-leyenda .suave {
+  flex: 1;
+}
+
+.punto {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  margin-right: 10px;
+  border-radius: 3px;
+}
+
+/* ---------- Caja: lo que se contó ---------- */
+.caja h3 {
+  margin-bottom: 4px;
 }
 
 .detalle {
@@ -304,9 +400,8 @@ const filasDetalle = computed(() => {
 .detalle li {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  border-bottom: 1px solid var(--linea);
+  min-height: 46px;
+  border-top: 1px solid var(--linea);
 }
 
 .detalle li .suave {
@@ -314,37 +409,44 @@ const filasDetalle = computed(() => {
 }
 
 .detalle li .monto {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .icono-fila {
   flex: none;
-  color: var(--verde-600);
+  margin-right: 12px;
+  color: var(--texto-tenue);
 }
 
-/* Franja del total: lo más importante del día */
+/* Total mientras se llena el formulario: grande y siempre claro */
 .total {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   padding: 16px;
-  border-radius: 16px;
-  font-weight: 800;
-  color: var(--verde-900);
-  background: var(--verde-50);
+  font-weight: 600;
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-1);
+}
+
+.total > span {
+  margin-right: 12px;
 }
 
 .total strong {
   font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
 .desglose {
   display: block;
   font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--verde-800);
+  font-weight: 500;
+  color: var(--texto-suave);
 }
 
 .conflicto {

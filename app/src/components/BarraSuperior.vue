@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
-import { IconBell, IconBuildingStore, IconCamera, IconKey, IconLogout, IconShieldCheck, IconUserCircle } from '@tabler/icons-vue'
+import { IconBell, IconBuildingStore, IconCamera, IconKey, IconLifebuoy, IconLogout, IconShieldCheck, IconUserCircle } from '@tabler/icons-vue'
 import HojaInferior from './HojaInferior.vue'
 import { useSesionStore } from '../stores/sesion'
 import { useDialogoStore } from '../stores/dialogo'
 import { useSincronizacionStore } from '../stores/sincronizacion'
 import { useComprobantesStore } from '../stores/comprobantes'
 import { guardarAjuste, leerAjuste, programarRecordatorios } from '../recordatorio'
+import { useAdminApi } from '../admin'
+import { fechaCorta } from '../calculos'
 
 // Barra verde de arriba: el negocio y el botón "Cuenta" (cambiar contraseña, RF-47, y salir, RF-02)
 const props = defineProps<{ titulo: string; admin?: boolean }>()
@@ -51,6 +53,32 @@ async function cambiarRecordatorio() {
   dialogo.avisar(recordatorio.activo ? `Le recordaremos el cierre a las ${hora}` : 'Recordatorio apagado')
 }
 
+/*
+ * Código de recuperación del admin: si olvida la contraseña, en la pantalla de entrar usa este
+ * código y pone una nueva, sin ayuda de nadie. Se muestra una sola vez; uno nuevo anula el anterior.
+ */
+const codigoCreadoEl = computed(() => sesion.usuario?.codigo_recuperacion_en ?? null)
+const codigo = ref<string | null>(null)
+
+async function crearCodigo() {
+  if (codigoCreadoEl.value) {
+    const confirmo = await dialogo.confirmar({
+      titulo: '¿Crear un código nuevo?',
+      mensaje: 'El código que tiene guardado dejará de servir. Guarde el nuevo en su lugar.',
+      aceptar: 'Crear código nuevo',
+      cancelar: 'Cancelar',
+    })
+    if (!confirmo) return
+  }
+  try {
+    codigo.value = (await useAdminApi().crearCodigo()).codigo
+    abierta.value = false
+    await sesion.actualizar() // para que aquí diga desde cuándo lo tiene
+  } catch {
+    dialogo.avisar('No se pudo crear el código. Revise la conexión.')
+  }
+}
+
 function cambiarContrasena() {
   abierta.value = false
   router.push({ name: 'contrasena' })
@@ -60,6 +88,9 @@ function salir() {
   abierta.value = false
   emit('salir')
 }
+
+// El panel del admin lo usa para el aviso "Cree su código de recuperación"
+defineExpose({ crearCodigo })
 </script>
 
 <template>
@@ -111,16 +142,39 @@ function salir() {
       <p v-if="recordatorio.activo" class="suave pequeno">Si ya hizo el cierre ese día, no le llega el aviso.</p>
     </section>
     <button type="button" class="boton secundario" @click="cambiarContrasena"><IconKey :size="22" aria-hidden="true" /> Cambiar contraseña</button>
+    <section v-if="admin" class="recuadro codigo">
+      <strong><IconLifebuoy :size="20" aria-hidden="true" class="campana" /> Código de recuperación</strong>
+      <p class="suave pequeno">
+        Si olvida su contraseña, con este código pone una nueva desde la pantalla de entrar.
+        {{ codigoCreadoEl ? `Tiene uno creado el ${fechaCorta(codigoCreadoEl.slice(0, 10))} ${codigoCreadoEl.slice(0, 4)}.` : 'Todavía no tiene uno.' }}
+      </p>
+      <button type="button" class="boton secundario" @click="crearCodigo">{{ codigoCreadoEl ? 'Crear un código nuevo' : 'Crear mi código' }}</button>
+    </section>
     <button type="button" class="boton secundario salir-cuenta" @click="salir"><IconLogout :size="22" aria-hidden="true" /> Salir</button>
+  </HojaInferior>
+
+  <!-- El código se muestra una sola vez -->
+  <HojaInferior :abierta="!!codigo" titulo="Su código de recuperación" @cerrar="codigo = null" @enviar="codigo = null">
+    <p>Escríbalo en un papel y guárdelo en un lugar seguro, o tómele una foto. Si olvida la contraseña, en la pantalla de entrar toque la rueda de ajustes (arriba a la derecha).</p>
+    <p class="clave-grande">{{ codigo }}</p>
+    <p class="suave pequeno">No se vuelve a mostrar y sirve una sola vez. Si lo pierde, cree uno nuevo aquí mismo.</p>
+    <template #acciones>
+      <button class="boton listo-codigo">Ya lo guardé</button>
+    </template>
   </HojaInferior>
 </template>
 
 <style scoped>
+/* Barra blanca con línea fina abajo: el verde queda para las acciones */
 .barra {
-  background: var(--verde-700);
-  color: #ffffff;
-  padding: 14px 16px 18px;
-  padding-top: max(14px, env(safe-area-inset-top));
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--superficie);
+  color: var(--texto);
+  border-bottom: 1px solid var(--linea);
+  padding: 10px 12px 10px 16px;
+  padding-top: max(10px, env(safe-area-inset-top));
 }
 
 .contenido {
@@ -137,8 +191,9 @@ function salir() {
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 14px;
-  background: rgb(255 255 255 / 0.14);
+  border-radius: 12px;
+  color: var(--verde-700);
+  background: var(--verde-50);
 }
 
 .textos {
@@ -147,7 +202,9 @@ function salir() {
 }
 
 h1 {
-  font-size: 1.2rem;
+  font-size: 1.12rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -162,9 +219,9 @@ h1 {
   min-height: 48px;
   padding: 4px 8px;
   font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--texto-suave);
   background: none;
   border: none;
   border-radius: 12px;
@@ -174,7 +231,8 @@ h1 {
 }
 
 .salir:hover {
-  background: rgb(255 255 255 / 0.12);
+  color: var(--texto);
+  background: var(--superficie-suave);
 }
 
 .salir:disabled {
@@ -204,9 +262,19 @@ h1 {
   color: var(--error);
 }
 
-.recordatorio {
+.recordatorio,
+.codigo {
   display: grid;
   gap: 12px;
+}
+
+.codigo p {
+  margin: 0;
+}
+
+/* "Ya lo guardé" ocupa todo el ancho (es el único botón) */
+.listo-codigo {
+  grid-column: 1 / -1;
 }
 
 .campana {

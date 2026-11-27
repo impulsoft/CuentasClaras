@@ -415,7 +415,7 @@ label.boton {
 .eleccion button {
   min-height: 48px;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--verde-800);
   background: var(--superficie);
   border: 1.5px solid var(--borde-campo);

@@ -65,13 +65,17 @@ Pulse **Deploy** otra vez para que tomen efecto. Revise que funcionen:
 
 ## 6. Crear la cuenta del administrador
 
-Una sola vez: en Dokploy, abra la terminal del contenedor `api` (pestaña **Docker** o **Terminal** del servicio) y corra:
+La API la crea sola al arrancar: si no existe el usuario `ADMIN_USUARIO`, lo crea con la contraseña `ADMIN_CONTRASENA` (en **Logs** del servicio `api` sale "Se creó el admin"). Si ya existe, no le cambia nada. Entre a la app con esa cuenta y cámbiele la contraseña desde **Cuenta**.
+
+**Si el admin no puede entrar** ("El usuario o la contraseña no son correctos"), por ejemplo porque olvidó la contraseña que puso en la app o porque cambió `ADMIN_CONTRASENA` después de crearlo: en Dokploy abra la terminal del contenedor `api` (pestaña **Docker** o **Terminal** del servicio) y corra:
 
 ```bash
-php artisan db:seed --force
+php artisan cierre:admin --restablecer
 ```
 
-Crea el usuario `ADMIN_USUARIO` con la contraseña `ADMIN_CONTRASENA`. Entre a la app con esa cuenta y cámbiele la contraseña desde **Cuenta**. No vuelva a correr el comando: le devolvería al admin la contraseña de las variables.
+Le vuelve a poner la contraseña que está en `ADMIN_CONTRASENA`, lo activa y cierra sus sesiones abiertas. Escríbala tal cual, sin comillas.
+
+**Si la app dice que necesita internet** al entrar, la página no llega a la API: revise que `https://api.su-dominio.co/up` abra, que `APP_URL` sea esa dirección (sin `/api`) y que `CORS_ORIGENES` tenga la dirección exacta de la página (`https://app.su-dominio.co`). Si cambia `APP_URL`, pulse **Deploy** otra vez: la página web la lleva por dentro.
 
 ## 7. Copias de seguridad fuera del servidor
 

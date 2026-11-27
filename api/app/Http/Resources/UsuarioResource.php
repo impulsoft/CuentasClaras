@@ -26,6 +26,8 @@ class UsuarioResource extends JsonResource
             'debe_aceptar_terminos' => $this->debeAceptarTerminos(),
             'debe_cambiar_contrasena' => $this->debe_cambiar_contrasena,
             'negocio' => $this->negocio?->paraDueno(), // RF-10, RF-12, RN-34
+            // Solo del admin: cuándo creó su código de recuperación (null si no tiene)
+            'codigo_recuperacion_en' => $this->when($this->rol === User::ADMIN, fn () => $this->codigo_recuperacion_en?->toIso8601String()),
         ];
     }
 }

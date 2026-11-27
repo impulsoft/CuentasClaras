@@ -37,9 +37,22 @@ class Negocio extends Model
         ];
     }
 
+    // La cuenta principal: la que se creó con el negocio (su nombre y teléfono se usan para llamarlo)
     public function dueno(): HasOne
     {
-        return $this->hasOne(User::class)->where('rol', User::DUENO);
+        return $this->hasOne(User::class)->where('rol', User::DUENO)->orderBy('id');
+    }
+
+    // Todas las cuentas del negocio: el dueño y las que el admin le agregó (todas pueden lo mismo)
+    public function cuentas(): HasMany
+    {
+        return $this->hasMany(User::class)->where('rol', User::DUENO)->orderBy('id');
+    }
+
+    // Las cuentas ya cargadas (en la lista del admin vienen con el negocio) o se consultan
+    private function cuentasCargadas()
+    {
+        return $this->relationLoaded('cuentas') ? $this->cuentas : $this->cuentas()->get();
     }
 
     public function pagosSuscripcion(): HasMany
@@ -165,16 +178,32 @@ class Negocio extends Model
 
     /*
      * El dueño pidió cancelar el servicio y borrar su información (Ley 1581, habeas data): se
-     * borran los datos ya, sin esperar los 6 meses, y la cuenta queda desactivada con las
-     * sesiones cerradas en todos sus celulares.
+     * borran los datos ya, sin esperar los 6 meses, y todas sus cuentas quedan desactivadas con
+     * las sesiones cerradas en todos sus celulares.
      */
     public function retirar(): void
     {
         DB::transaction(function () {
             $this->borrarDatos();
-            $this->dueno?->update(['activo' => false, 'desactivado_en' => now()]);
-            $this->dueno?->tokens()->delete();
+            $this->desactivarCuentas();
         });
+    }
+
+    // RF-05 / RN-16: nadie del negocio puede entrar; su historial se conserva (RN-34)
+    public function desactivarCuentas(): void
+    {
+        foreach ($this->cuentas()->get() as $cuenta) {
+            $cuenta->desactivar();
+        }
+        $this->unsetRelation('cuentas');
+    }
+
+    // Un negocio está "desactivado" cuando tiene cuentas y ninguna puede entrar
+    public function sinCuentasActivas(): bool
+    {
+        $cuentas = $this->cuentasCargadas();
+
+        return $cuentas->isNotEmpty() && $cuentas->every(fn (User $c) => ! $c->activo);
     }
 
     /**
@@ -186,7 +215,8 @@ class Negocio extends Model
         $fechas = array_filter([
             $this->estadoSuscripcion() === 'vencida' ? $this->suscripcion_vence_el : null,
             $this->bloqueado_en,
-            $this->dueno?->activo === false ? $this->dueno->desactivado_en : null,
+            // Desde que se desactivó la última de sus cuentas
+            $this->sinCuentasActivas() ? $this->cuentasCargadas()->max('desactivado_en') : null,
         ]);
         if (! $fechas) {
             return null;

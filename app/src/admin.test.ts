@@ -7,6 +7,7 @@ import {
   enlaceAyuda,
   enlaceCobro,
   enGrupo,
+  negocioDesactivado,
   filtrarNegocios,
   haceCuanto,
   necesitaAyuda,
@@ -57,6 +58,7 @@ describe('negocios que necesitan ayuda', () => {
     datos_se_borran_el: null,
     datos_borrados_en: null,
     ultimo_valor: 30000,
+    cuentas: { total: 1, activas: 1 },
     deudas: { por_cobrar: 0, deudores: 0, vencidos: 0 },
     dueno: { nombre: 'José Martínez', usuario: id, telefono: '3109876543', activo: true, debe_cambiar_contrasena: false },
     actividad: { ultimo_cierre: ultimo, ultima_conexion: null },
@@ -76,7 +78,7 @@ describe('negocios que necesitan ayuda', () => {
     expect(necesitaAyuda(negocio('b', '2026-11-20'), HOY)).toBe(true) // hace 3 días
     expect(necesitaAyuda(negocio('c', null), HOY)).toBe(true)
     expect(necesitaAyuda(negocio('d', null, { estado: 'bloqueado' }), HOY)).toBe(false)
-    expect(necesitaAyuda(negocio('e', null, { dueno: { nombre: 'X', usuario: 'e', telefono: null, activo: false, debe_cambiar_contrasena: false } }), HOY)).toBe(false)
+    expect(necesitaAyuda(negocio('e', null, { dueno: { nombre: 'X', usuario: 'e', telefono: null, activo: false, debe_cambiar_contrasena: false }, cuentas: { total: 1, activas: 0 } }), HOY)).toBe(false)
   })
 
   it('primero los que nunca han cerrado y luego los de más días', () => {
@@ -119,9 +121,16 @@ describe('negocios que necesitan ayuda', () => {
       conVencimiento('b', 2, '2026-11-25'), // por vencer
       conVencimiento('c', -4, '2026-11-19'), // vencido
       conVencimiento('d', -9, '2026-11-14', { estado: 'bloqueado' }), // bloqueado (aunque esté vencido)
-      conVencimiento('e', 9, '2026-12-02', { dueno: desactivado }), // desactivado (aunque esté al día)
+      conVencimiento('e', 9, '2026-12-02', { dueno: desactivado, cuentas: { total: 2, activas: 0 } }), // desactivado (aunque esté al día)
       conVencimiento('f', -40, '2026-10-14', { estado: 'bloqueado', datos_borrados_en: '2026-11-20T10:00:00-05:00' }), // retirado
     ]
+
+    it('con varias cuentas, solo está desactivado si ninguna puede entrar', () => {
+      const unaActiva = conVencimiento('g', 9, '2026-12-02', { dueno: desactivado, cuentas: { total: 2, activas: 1 } })
+      expect(negocioDesactivado(unaActiva)).toBe(false)
+      expect(enGrupo(unaActiva, 'al_dia')).toBe(true)
+      expect(negocioDesactivado(lista[4]!)).toBe(true)
+    })
 
     it('los desactivados solo están en su grupo; un bloqueado vencido está en los dos', () => {
       expect(contarGrupos(lista)).toEqual({ todos: 6, al_dia: 1, por_vencer: 1, vencidos: 2, bloqueados: 1, desactivados: 2 })
@@ -188,6 +197,13 @@ describe('meses pagados de un negocio', () => {
     expect(meses[9]!.estado).toBe('sin_pagar') // octubre: el de septiembre vence el 1 (no cubre el mes)
     expect(meses[10]!.estado).toBe('sin_pagar')
     expect(meses[10]!.pagos).toHaveLength(1)
+  })
+
+  it('un mes gratis (pago de $0) cuenta como pagado y cubre el mes', () => {
+    const pagos = [pago('2026-09-10', 0, '2026-10-10', { nota: 'Primer mes gratis' }), pago('2026-10-08', 30000, '2026-11-10', { vencia_el: '2026-10-10' })]
+    const meses = mesesDePagos(pagos, 2026, HOY, '2026-09-10')
+    expect(meses[8]).toMatchObject({ estado: 'pagado', total: 0 })
+    expect(meses[9]).toMatchObject({ estado: 'pagado', total: 30000 })
   })
 
   it('en el mes actual cuenta si hoy sigue al día', () => {

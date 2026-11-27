@@ -1,5 +1,6 @@
 /*
- * Sistema de diseño de Cierre de Caja: verde esmeralda, cercano y claro.
+ * Sistema de diseño de Cierre de Caja: limpio y profesional. Fondo neutro, tarjetas blancas con
+ * borde fino, letra Inter y el verde solo para acciones y estados buenos.
  * Pensado para personas sin experiencia: letras grandes, botones grandes y mensajes amables (RNF-05).
  */
 :root {
@@ -12,14 +13,14 @@
   --verde-50: #e1f5ee;
 
   /* Superficies y texto */
-  --fondo: #f6f7f5;
+  --fondo: #f4f6f5;
   --superficie: #ffffff;
-  --superficie-suave: #f1f3f0;
-  --texto: #1c2622;
-  --texto-suave: #5d6964;
-  --texto-tenue: #8a948f;
-  --linea: #e4e8e5;
-  --borde-campo: #cfd6d2;
+  --superficie-suave: #f2f4f3;
+  --texto: #17211d;
+  --texto-suave: #5a6560;
+  --texto-tenue: #8a938f;
+  --linea: #e6eae8;
+  --borde-campo: #d3d9d6;
 
   /* Estados del calendario (los del prototipo, sección 8) */
   --cerrado: #eaf3de;
@@ -42,16 +43,19 @@
   --enlace: #0f6e56;
 
   /* Forma */
-  --radio-tarjeta: 20px;
-  --radio-control: 14px;
+  --radio-tarjeta: 16px;
+  --radio-control: 12px;
   --radio-pildora: 999px;
-  --sombra-1: 0 1px 2px rgb(16 32 26 / 0.06), 0 1px 3px rgb(16 32 26 / 0.06);
-  --sombra-2: 0 2px 4px rgb(16 32 26 / 0.05), 0 8px 24px rgb(16 32 26 / 0.08);
-  --sombra-3: 0 12px 40px rgb(16 32 26 / 0.18);
+  /* Sombras muy suaves: la tarjeta se separa del fondo por su borde fino, no por una sombra pesada */
+  --sombra-1: 0 1px 2px rgb(16 24 20 / 0.04);
+  --sombra-2: 0 1px 2px rgb(16 24 20 / 0.04), 0 4px 12px rgb(16 24 20 / 0.04);
+  --sombra-3: 0 16px 48px rgb(16 24 20 / 0.16), 0 2px 6px rgb(16 24 20 / 0.06);
 
-  font-family: 'Nunito Variable', 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 18px; /* textos claros y grandes (RNF-05) */
-  line-height: 1.45;
+  /* Inter va dentro de la app (main.ts): funciona sin internet y en Android 7 */
+  font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 17px; /* textos claros y grandes (RNF-05) */
+  line-height: 1.5;
+  font-feature-settings: 'cv11', 'ss01'; /* "1" y "a" más fáciles de leer en Inter */
   color: var(--texto);
   background: var(--fondo);
   -webkit-font-smoothing: antialiased;
@@ -83,18 +87,20 @@ h3 {
 }
 
 h1 {
-  font-size: 1.5rem;
-  font-weight: 800;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 h2 {
-  font-size: 1.2rem;
-  font-weight: 800;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 h3 {
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 p {
@@ -102,10 +108,14 @@ p {
   text-wrap: pretty;
 }
 
-/* Montos: los números no "saltan" al cambiar */
+/* Montos: los números no "saltan" al cambiar y se leen compactos */
 .monto,
 .campo input {
   font-variant-numeric: tabular-nums;
+}
+
+.monto {
+  letter-spacing: -0.01em;
 }
 
 /* ---------- Pantallas ---------- */
@@ -138,9 +148,10 @@ p {
 
 .tarjeta {
   background: var(--superficie);
+  border: 1px solid var(--linea);
   border-radius: var(--radio-tarjeta);
-  box-shadow: var(--sombra-2);
-  padding: 20px 16px;
+  box-shadow: var(--sombra-1);
+  padding: 18px 16px;
   display: grid;
   gap: 14px;
 }
@@ -153,8 +164,10 @@ p {
   min-width: 0;
 }
 
+/* Bloque dentro de una pantalla o de una tarjeta: blanco con borde fino */
 .recuadro {
-  background: var(--superficie-suave);
+  background: var(--superficie);
+  border: 1px solid var(--linea);
   border-radius: var(--radio-control);
   padding: 14px 16px;
 }
@@ -169,8 +182,8 @@ p {
 .campo {
   display: grid;
   gap: 6px;
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 0.88rem;
+  font-weight: 600;
   color: var(--texto-suave);
 }
 
@@ -191,14 +204,14 @@ p {
 .campo textarea,
 .campo select {
   width: 100%;
-  min-height: 54px;
+  min-height: 52px;
   font: inherit;
-  font-size: 1.15rem;
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 500;
   color: var(--texto);
   background: var(--superficie);
   padding: 12px 16px;
-  border: 1.5px solid var(--borde-campo);
+  border: 1px solid var(--borde-campo);
   border-radius: var(--radio-control);
   transition-property: border-color, box-shadow;
   transition-duration: 150ms;
@@ -226,7 +239,7 @@ p {
 .campo input::placeholder,
 .campo textarea::placeholder {
   color: var(--texto-tenue);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .campo textarea:focus,
@@ -234,7 +247,7 @@ p {
 .campo input:focus {
   outline: none;
   border-color: var(--verde-600);
-  box-shadow: 0 0 0 4px rgb(29 158 117 / 0.18);
+  box-shadow: 0 0 0 3px rgb(29 158 117 / 0.16);
 }
 
 .campo input:disabled {
@@ -250,7 +263,7 @@ p {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -269,23 +282,24 @@ p {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 56px;
+  min-height: 54px;
   padding: 14px 20px;
   font: inherit;
-  font-size: 1.1rem;
-  font-weight: 800;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
   color: #ffffff;
-  background: var(--verde-600);
+  background: var(--verde-700);
   border: none;
   border-radius: var(--radio-control);
-  box-shadow: 0 1px 2px rgb(4 52 44 / 0.2), inset 0 -2px 0 rgb(4 52 44 / 0.15);
+  box-shadow: 0 1px 2px rgb(4 52 44 / 0.18);
   cursor: pointer;
   transition-property: background-color, transform, opacity;
   transition-duration: 150ms;
 }
 
 .boton:hover {
-  background: var(--verde-700);
+  background: var(--verde-800);
 }
 
 .boton:active:not(:disabled) {
@@ -293,20 +307,29 @@ p {
 }
 
 .boton.secundario {
-  color: var(--verde-800);
+  color: var(--texto);
   background: var(--superficie);
-  box-shadow: inset 0 0 0 1.5px var(--borde-campo);
+  box-shadow: inset 0 0 0 1px var(--borde-campo), 0 1px 2px rgb(16 24 20 / 0.04);
+}
+
+.boton.secundario svg {
+  color: var(--verde-700);
 }
 
 .boton.secundario:hover {
-  background: var(--verde-50);
+  background: var(--superficie-suave);
 }
 
 /* Acciones que no se deshacen (anular): en rojo, con borde, para que no se toquen por error */
-.boton.peligro {
+.boton.peligro,
+.boton.secundario.peligro {
   color: var(--error);
   background: var(--superficie);
-  box-shadow: inset 0 0 0 1.5px var(--error);
+  box-shadow: inset 0 0 0 1px rgb(163 45 45 / 0.45);
+}
+
+.boton.peligro svg {
+  color: var(--error);
 }
 
 .boton.peligro:hover {
@@ -326,7 +349,7 @@ p {
   min-height: 44px;
   padding: 8px 12px;
   font: inherit;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--enlace);
   background: none;
   border: none;
@@ -346,10 +369,10 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: var(--radio-pildora);
-  font-size: 0.8rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -375,7 +398,8 @@ p {
   color: var(--cerrado-texto);
 }
 
-.etiqueta.abono {
+.etiqueta.abono,
+.etiqueta.info {
   background: var(--info-fondo);
   color: var(--info-texto);
 }
@@ -397,7 +421,7 @@ p {
   align-items: flex-start;
   padding: 12px 14px;
   border-radius: var(--radio-control);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .mensaje svg {
@@ -422,12 +446,12 @@ p {
 
 .error {
   color: var(--error);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .exito {
   color: var(--exito);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -437,4 +461,20 @@ p {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
   }
+}
+
+/* Contraseña temporal o código de recuperación: grande, fácil de dictar y de copiar */
+.clave-grande {
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  color: var(--verde-900);
+  background: var(--verde-50);
+  border-radius: var(--radio-control);
+  user-select: all;
 }

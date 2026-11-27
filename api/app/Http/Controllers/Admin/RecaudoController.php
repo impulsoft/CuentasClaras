@@ -26,7 +26,7 @@ class RecaudoController extends Controller
         $meses = [];
         for ($mes = $desde->copy(); $mes->lessThanOrEqualTo(today()); $mes->addMonthNoOverflow()) {
             $pagos = $porMes->get($mes->format('Y-m'), collect());
-            $meses[] = ['mes' => $mes->format('Y-m'), 'total' => (int) $pagos->sum('valor'), 'pagos' => $pagos->count()];
+            $meses[] = ['mes' => $mes->format('Y-m'), 'total' => (int) $pagos->sum('valor'), 'pagos' => $pagos->where('valor', '>', 0)->count()]; // los meses gratis no son pagos
         }
 
         return ['meses' => $meses, 'total' => array_sum(array_column($meses, 'total'))];

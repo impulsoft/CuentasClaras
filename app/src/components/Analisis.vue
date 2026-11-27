@@ -307,14 +307,14 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
-  background: var(--superficie-suave);
-  border-radius: 16px;
+  background: #e9edeb;
+  border-radius: 14px;
 }
 
 .vistas button {
-  min-height: 48px;
+  min-height: 44px;
   font: inherit;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--texto-suave);
   background: none;
   border: none;
@@ -325,9 +325,9 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
 }
 
 .vistas button.activa {
-  color: var(--verde-800);
+  color: var(--texto);
   background: var(--superficie);
-  box-shadow: var(--sombra-1);
+  box-shadow: 0 1px 3px rgb(16 24 20 / 0.1);
 }
 
 .periodo {
@@ -338,15 +338,15 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
 }
 
 .flecha {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   flex: none;
   display: grid;
   place-items: center;
-  color: var(--verde-800);
-  background: var(--verde-50);
-  border: none;
-  border-radius: 14px;
+  color: var(--texto-suave);
+  background: none;
+  border: 1px solid var(--linea);
+  border-radius: 12px;
   cursor: pointer;
 }
 
@@ -362,8 +362,9 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
 
 .total strong {
   font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   line-height: 1.1;
-  color: var(--verde-800);
 }
 
 .extremos {
@@ -381,7 +382,8 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
   gap: 10px;
   padding: 10px 12px;
   border-radius: var(--radio-control);
-  background: var(--superficie-suave);
+  background: var(--superficie);
+  border: 1px solid var(--linea);
   color: var(--texto-suave);
 }
 
@@ -391,7 +393,7 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
 }
 
 .extremos .monto {
-  font-weight: 800;
+  font-weight: 650;
   color: var(--texto);
 }
 
@@ -447,7 +449,7 @@ const nombresMejor = { dia: ['Día de mayor venta', 'Día de menor venta'], mes:
 
 /* El total vendido va primero y resaltado */
 .comparacion tbody:first-of-type {
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .sube {

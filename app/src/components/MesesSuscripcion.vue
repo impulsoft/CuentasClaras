@@ -22,7 +22,9 @@ const seleccionado = ref(props.hoy.slice(0, 7))
 watch(anio, (a) => (seleccionado.value = a === anioActual ? props.hoy.slice(0, 7) : `${a}-12`))
 const elegido = computed(() => meses.value.find((m) => m.mes === seleccionado.value) ?? null)
 
-const pagados = computed(() => meses.value.filter((m) => m.estado === 'pagado'))
+// Los meses gratis (pagos de $0) se cuentan aparte
+const pagados = computed(() => meses.value.filter((m) => m.estado === 'pagado' && m.total > 0))
+const gratis = computed(() => meses.value.filter((m) => m.estado === 'pagado' && m.total === 0).length)
 const sinPagar = computed(() => meses.value.filter((m) => m.estado === 'sin_pagar').length)
 const totalAnio = computed(() => pagados.value.reduce((suma, m) => suma + m.total, 0))
 
@@ -43,8 +45,8 @@ const DETALLE: Record<EstadoMesPago, string> = {
   antes: 'Todavía no era cliente.',
   futuro: '',
 }
-const textoDe = (m: MesPagos) => (m.estado === 'pagado' ? pesosCortos(m.total) : TEXTO[m.estado])
-const descripcion = (m: MesPagos) => `${largo(m.mes)}: ${m.estado === 'pagado' ? `pagó ${pesos(m.total)}` : TEXTO[m.estado] === '—' ? 'todavía no era cliente' : TEXTO[m.estado].toLowerCase() || 'no ha llegado'}`
+const textoDe = (m: MesPagos) => (m.estado === 'pagado' ? (m.total ? pesosCortos(m.total) : 'Gratis') : TEXTO[m.estado])
+const descripcion = (m: MesPagos) => `${largo(m.mes)}: ${m.estado === 'pagado' ? (m.total ? `pagó ${pesos(m.total)}` : 'mes gratis') : TEXTO[m.estado] === '—' ? 'todavía no era cliente' : TEXTO[m.estado].toLowerCase() || 'no ha llegado'}`
 
 function cambiarAnio(paso: 1 | -1) {
   const siguiente = anio.value + paso
@@ -81,9 +83,15 @@ function cambiarAnio(paso: 1 | -1) {
       </button>
     </div>
 
+    <!-- "En 2026: pagó 6 meses · $180.000 · 1 mes gratis · 1 mes sin pagar" (solo las partes que tienen algo) -->
     <p class="resumen">
-      En {{ anio }}: <strong>{{ pagados.length === 1 ? 'pagó 1 mes' : `pagó ${pagados.length} meses` }}</strong> · {{ pesos(totalAnio) }}
-      <template v-if="sinPagar"> · <span class="falta">{{ sinPagar === 1 ? '1 mes sin pagar' : `${sinPagar} meses sin pagar` }}</span></template>
+      En {{ anio }}:
+      <template v-if="pagados.length">
+        <strong>{{ pagados.length === 1 ? 'pagó 1 mes' : `pagó ${pagados.length} meses` }}</strong> · {{ pesos(totalAnio) }}
+      </template>
+      <template v-if="gratis">{{ pagados.length ? ' · ' : '' }}<strong>{{ gratis === 1 ? '1 mes gratis' : `${gratis} meses gratis` }}</strong></template>
+      <template v-if="sinPagar">{{ pagados.length || gratis ? ' · ' : '' }}<span class="falta">{{ sinPagar === 1 ? '1 mes sin pagar' : `${sinPagar} meses sin pagar` }}</span></template>
+      <template v-if="!pagados.length && !gratis && !sinPagar">sin pagos</template>
     </p>
 
     <div class="leyenda" aria-hidden="true">
@@ -148,18 +156,31 @@ function cambiarAnio(paso: 1 | -1) {
 }
 
 /* El botón no es contenedor flex (Android 7): cada renglón es un span en bloque */
+/* Casilla como la del calendario del dueño: blanca, con una rayita de color abajo por estado */
 .mes {
-  min-height: 64px;
-  padding: 8px 4px;
+  position: relative;
+  min-height: 62px;
+  padding: 8px 4px 9px;
+  overflow: hidden;
   font: inherit;
   text-align: center;
   color: var(--texto);
   background: var(--superficie);
-  border: 1.5px solid var(--linea);
-  border-radius: 14px;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
   cursor: pointer;
-  transition-property: transform, box-shadow;
+  transition-property: transform, box-shadow, border-color;
   transition-duration: 150ms;
+}
+
+.mes::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: transparent;
 }
 
 .mes:active:not(:disabled) {
@@ -172,57 +193,72 @@ function cambiarAnio(paso: 1 | -1) {
 }
 
 .nombre {
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.3;
 }
 
 .texto {
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--texto-suave);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
 }
 
-.pagado {
-  background: var(--cerrado);
-  border-color: var(--cerrado-borde);
-  color: var(--cerrado-texto);
+.mes.pagado::after,
+.muestra.pagado {
+  background: var(--verde-600);
 }
 
-.al_dia {
-  background: var(--verde-50);
-  border: 1.5px dashed var(--cerrado-borde);
-  color: var(--cerrado-texto);
+.mes.pagado .texto {
+  color: var(--texto);
 }
 
-.sin_pagar {
-  background: var(--error-fondo);
-  border-color: var(--error);
+.mes.al_dia::after,
+.muestra.al_dia {
+  background: var(--verde-200);
+}
+
+.mes.al_dia .texto {
+  color: var(--verde-700);
+}
+
+.mes.sin_pagar::after,
+.muestra.sin_pagar {
+  background: var(--error);
+}
+
+.mes.sin_pagar .texto {
   color: var(--error);
 }
 
-.antes {
-  background: var(--no-abrio);
-  border-color: var(--no-abrio-borde);
-  color: var(--texto-suave);
+.mes.antes {
+  background: var(--superficie-suave);
+  color: var(--texto-tenue);
 }
 
-.futuro {
-  color: #c2c8c4;
+.muestra.antes {
+  background: var(--no-abrio-borde);
+}
+
+.mes.futuro {
+  color: #c4cac7;
   background: transparent;
-  border-color: #eef0ee;
+  border-color: transparent;
   cursor: default;
 }
 
-/* Mes actual: aro verde; mes escogido: aro oscuro (como el calendario del dueño) */
+/* Mes actual: borde verde; mes escogido: aro oscuro (como el calendario del dueño) */
 .actual:not(.seleccionado) {
-  box-shadow: 0 0 0 2.5px var(--verde-600);
+  border-color: var(--verde-600);
+  box-shadow: 0 0 0 1px var(--verde-600);
 }
 
 .seleccionado {
-  box-shadow: 0 0 0 3px var(--texto), var(--sombra-2);
+  border-color: var(--texto);
+  box-shadow: 0 0 0 1.5px var(--texto);
 }
 
 .resumen {
@@ -232,7 +268,7 @@ function cambiarAnio(paso: 1 | -1) {
 
 .falta {
   color: var(--error);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .leyenda {
@@ -250,19 +286,13 @@ function cambiarAnio(paso: 1 | -1) {
   margin: 0 6px 4px;
 }
 
+/* Muestra de la leyenda: una rayita del color del estado */
 .muestra {
   display: inline-block;
   width: 14px;
-  height: 14px;
-  margin-right: 5px;
-  border-radius: 4px;
-  /* Sin color: lo pone la clase del estado (.pagado, .sin_pagar...), que va antes en este archivo */
-  border-width: 1.5px;
-  border-style: solid;
-}
-
-.muestra.al_dia {
-  border-style: dashed;
+  height: 4px;
+  margin-right: 6px;
+  border-radius: 2px;
 }
 
 .detalle {

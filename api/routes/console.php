@@ -2,6 +2,7 @@
 
 use App\Models\Negocio;
 use App\Models\Pago;
+use App\Models\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -10,6 +11,49 @@ use Illuminate\Support\Facades\Storage;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+/*
+ * Cuenta del administrador (ADMIN_USUARIO y ADMIN_CONTRASENA). La API lo corre sola al arrancar
+ * (docker/iniciar.sh): si el admin no existe, lo crea; si ya existe, no le toca nada, para no
+ * deshacer la contraseña que él cambió desde la app.
+ * Con --restablecer le vuelve a poner la contraseña de ADMIN_CONTRASENA (si se le olvidó),
+ * lo activa y cierra sus sesiones abiertas.
+ */
+Artisan::command('cierre:admin {--restablecer : Vuelve a poner la contraseña de ADMIN_CONTRASENA}', function () {
+    $usuario = config('cierre.admin.usuario');
+    $contrasena = config('cierre.admin.contrasena');
+    if (! $usuario || ! $contrasena) {
+        $this->error('Falta ADMIN_USUARIO o ADMIN_CONTRASENA en las variables.');
+
+        return 1;
+    }
+
+    $admin = User::where('usuario', $usuario)->first();
+    if ($admin && $admin->rol !== User::ADMIN) {
+        $this->error("El usuario «{$usuario}» ya existe y es de un dueño. Escoja otro ADMIN_USUARIO.");
+
+        return 1;
+    }
+
+    if (! $admin) {
+        User::create(['usuario' => $usuario, 'rol' => User::ADMIN, 'nombre' => 'Administrador', 'password' => $contrasena]);
+        $this->info("Se creó el admin «{$usuario}» con la contraseña de ADMIN_CONTRASENA.");
+
+        return 0;
+    }
+
+    if ($this->option('restablecer')) {
+        $admin->update(['password' => $contrasena, 'activo' => true, 'desactivado_en' => null]);
+        $admin->tokens()->delete();
+        $this->info("Listo: el admin «{$usuario}» ya entra con la contraseña de ADMIN_CONTRASENA.");
+
+        return 0;
+    }
+
+    $this->line("El admin «{$usuario}» ya existe; no se cambió nada. Si olvidó la contraseña: php artisan cierre:admin --restablecer");
+
+    return 0;
+})->purpose('Crea la cuenta del admin si no existe (o le restablece la contraseña con --restablecer)');
 
 // RN-43: las fotos de los comprobantes se guardan 90 días; los datos leídos se conservan
 Artisan::command('comprobantes:borrar-fotos', function () {

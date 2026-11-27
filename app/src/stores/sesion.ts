@@ -22,6 +22,7 @@ export interface Usuario {
   debe_aceptar_terminos: boolean
   debe_cambiar_contrasena: boolean
   negocio: NegocioDelDueno | null
+  codigo_recuperacion_en?: string | null // solo el admin: cuándo creó su código de recuperación
 }
 
 const CLAVE = 'cierre-de-caja.sesion'

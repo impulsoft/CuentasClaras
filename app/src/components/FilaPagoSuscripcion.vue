@@ -16,7 +16,7 @@ const conAnio = (fecha: string) => `${fechaCorta(fecha)} ${fecha.slice(0, 4)}`
       <span v-else class="suave pequeno">Hasta el {{ conAnio(pago.vence_el) }}</span>
     </span>
     <span class="valor">
-      <strong class="monto">{{ pesos(pago.valor) }}</strong>
+      <strong class="monto" :class="{ gratis: pago.valor === 0 }">{{ pago.valor === 0 ? 'Gratis' : pesos(pago.valor) }}</strong>
       <button v-if="!pago.anulado_en" class="boton-texto anular" :aria-label="`Anular el pago del ${conAnio(pago.fecha)}`" @click="emit('anular', pago)">
         Anular
       </button>
@@ -45,6 +45,11 @@ const conAnio = (fecha: string) => `${fechaCorta(fecha)} ${fecha.slice(0, 4)}`
   display: grid;
   justify-items: end;
   flex: none;
+}
+
+/* Un mes gratis (pago de $0) */
+.gratis {
+  color: var(--verde-700);
 }
 
 /* Un toque cómodo aunque el texto sea pequeño */

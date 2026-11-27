@@ -47,8 +47,7 @@ const abonos = useConsulta(() => abonosDelDia(props.fecha), [], [() => props.fec
   place-items: center;
   border-radius: 12px;
   color: var(--info-texto);
-  background: var(--superficie);
-  box-shadow: var(--sombra-1);
+  background: var(--info-fondo);
 }
 
 .nombre {

@@ -34,9 +34,17 @@ export interface NegocioAdmin {
   datos_borrados_en: string | null
   ultimo_valor: number
   deudas: { por_cobrar: number; deudores: number; vencidos: number } // RF-44
+  // La cuenta principal (la que se creó con el negocio): su nombre y teléfono se usan para llamarlo
   dueno: { nombre: string; usuario: string; telefono: string | null; activo: boolean; debe_cambiar_contrasena: boolean } | null
+  // Cuántas cuentas tiene el negocio y cuántas pueden entrar (todas pueden lo mismo que el dueño)
+  cuentas: { total: number; activas: number }
   // Último día registrado (cierre o "No abrió") y última vez que la app habló con el servidor
   actividad: { ultimo_cierre: string | null; ultima_conexion: string | null }
+}
+
+// Ya no usa el servicio: fue retirado o ninguna de sus cuentas puede entrar
+export function negocioDesactivado(n: NegocioAdmin): boolean {
+  return !!n.datos_borrados_en || (n.cuentas.total > 0 && n.cuentas.activas === 0)
 }
 
 /*
@@ -64,7 +72,7 @@ export function textoUltimoCierre(n: Pick<NegocioAdmin, 'actividad'>, hoy: strin
 }
 
 export function necesitaAyuda(n: NegocioAdmin, hoy: string): boolean {
-  if (n.estado !== 'activo' || n.datos_borrados_en || n.dueno?.activo === false) return false
+  if (n.estado !== 'activo' || negocioDesactivado(n)) return false
   const ultimo = n.actividad.ultimo_cierre
   return !ultimo || diasDesde(ultimo, hoy) >= DIAS_SIN_CIERRE
 }
@@ -96,7 +104,7 @@ export function enlaceAyuda(n: NegocioAdmin, hoy: string): string | null {
  */
 export function porVencer(negocios: NegocioAdmin[]): NegocioAdmin[] {
   return negocios
-    .filter((n) => n.suscripcion.estado === 'por_vencer' && !n.datos_borrados_en && n.dueno?.activo !== false)
+    .filter((n) => n.suscripcion.estado === 'por_vencer' && !negocioDesactivado(n))
     .sort((a, b) => (a.suscripcion.dias ?? 0) - (b.suscripcion.dias ?? 0))
 }
 
@@ -126,7 +134,7 @@ export const GRUPOS: { valor: GrupoNegocio | 'todos'; texto: string }[] = [
   { valor: 'desactivados', texto: 'Desactivados' },
 ]
 
-const desactivado = (n: NegocioAdmin) => n.dueno?.activo === false || !!n.datos_borrados_en
+const desactivado = negocioDesactivado
 
 export function enGrupo(n: NegocioAdmin, grupo: GrupoNegocio | 'todos'): boolean {
   if (grupo === 'todos') return true
@@ -228,7 +236,32 @@ export function aniosDePagos(pagos: PagoSuscripcion[], hoy: string, clienteDesde
   return Array.from({ length: actual - desde + 1 }, (_, i) => desde + i)
 }
 
+/*
+ * Una cuenta vista por el admin: un administrador del sistema o una cuenta de un negocio.
+ * Las cuentas de un negocio pueden todas lo mismo que el dueño; "principal" es la del dueño.
+ */
+export interface CuentaUsuario {
+  id: number
+  nombre: string
+  usuario: string
+  telefono: string | null
+  rol: 'admin' | 'dueno'
+  activo: boolean
+  debe_cambiar_contrasena: boolean
+  ultima_conexion: string | null
+  negocio: { id: string; nombre: string } | null
+  principal: boolean
+  es_yo: boolean
+  tiene_codigo_recuperacion: boolean
+}
+
+export interface UsuariosAdmin {
+  administradores: CuentaUsuario[]
+  cuentas: CuentaUsuario[]
+}
+
 export interface DetalleNegocio extends NegocioAdmin {
+  usuarios: CuentaUsuario[]
   pagos: PagoSuscripcion[]
 }
 
@@ -276,6 +309,15 @@ export function useAdminApi() {
     anularPago: (id: string, pago: number, motivo: string) => enviar<DetalleNegocio>(`/negocios/${id}/pagos/${pago}/anular`, { motivo }),
     // A pedido del dueño: borra sus datos y desactiva la cuenta. Pide escribir el nombre del negocio
     retirar: (id: string, confirmacion: string) => enviar<DetalleNegocio>(`/negocios/${id}/retirar`, { confirmacion }),
+    // Usuarios: administradores y cuentas de los negocios
+    usuarios: () => get<UsuariosAdmin>('/usuarios'),
+    crearAdmin: (datos: { nombre: string; usuario: string }) => enviar<{ contrasena_temporal: string; usuario: CuentaUsuario }>('/administradores', datos),
+    crearCuenta: (negocioId: string, datos: { nombre: string; usuario: string; telefono: string | null }) =>
+      enviar<{ contrasena_temporal: string; usuario: CuentaUsuario }>(`/negocios/${negocioId}/cuentas`, datos),
+    editarUsuario: (id: number, datos: { nombre: string; usuario: string; telefono: string | null }) => enviar<CuentaUsuario>(`/usuarios/${id}`, datos, 'PUT'),
+    temporalDe: (id: number) => enviar<{ contrasena_temporal: string }>(`/usuarios/${id}/contrasena`),
+    accionUsuario: (id: number, accion: 'desactivar' | 'activar') => enviar<CuentaUsuario>(`/usuarios/${id}/${accion}`),
+    crearCodigo: () => enviar<{ codigo: string; creado_en: string }>('/codigo-recuperacion'),
     restablecer: (id: string) => enviar<{ contrasena_temporal: string }>(`/negocios/${id}/contrasena`),
   }
 }

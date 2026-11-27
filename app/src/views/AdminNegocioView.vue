@@ -6,22 +6,23 @@ import {
   IconChartBar,
   IconCash,
   IconDownload,
-  IconKey,
   IconLock,
   IconLockOpen,
   IconPencil,
   IconTrash,
-  IconUserCheck,
-  IconUserOff,
+  IconUserPlus,
 } from '@tabler/icons-vue'
 import BarraVolver from '../components/BarraVolver.vue'
+import CrearCuenta from '../components/CrearCuenta.vue'
+import FilaCuenta from '../components/FilaCuenta.vue'
+import GestionCuenta from '../components/GestionCuenta.vue'
 import DescargarExcel from '../components/DescargarExcel.vue'
 import FilaPagoSuscripcion from '../components/FilaPagoSuscripcion.vue'
 import MesesSuscripcion from '../components/MesesSuscripcion.vue'
 import HojaInferior from '../components/HojaInferior.vue'
 import RegistrarPagoSuscripcion from '../components/RegistrarPagoSuscripcion.vue'
 import { fechaCorta, fechaLarga, hoy, pesos } from '../calculos'
-import { COLOR_SUSCRIPCION, haceCuanto, necesitaAyuda, NOMBRE_SUSCRIPCION, textoVencimiento, useAdminApi, type DetalleNegocio, type PagoSuscripcion } from '../admin'
+import { COLOR_SUSCRIPCION, haceCuanto, necesitaAyuda, NOMBRE_SUSCRIPCION, textoVencimiento, useAdminApi, type CuentaUsuario, type DetalleNegocio, type PagoSuscripcion } from '../admin'
 import { ErrorApi } from '../api'
 import { useDialogoStore } from '../stores/dialogo'
 
@@ -47,7 +48,7 @@ watch(() => props.id, cargar)
 const conAnio = (fecha: string) => `${fechaLarga(fecha)} de ${fecha.slice(0, 4)}`
 
 // Acciones que solo cambian un estado, con su confirmación
-async function hacer(accion: 'bloquear' | 'desbloquear' | 'activar' | 'desactivar') {
+async function hacer(accion: 'bloquear' | 'desbloquear') {
   const n = negocio.value!
   const textos = {
     bloquear: {
@@ -57,20 +58,13 @@ async function hacer(accion: 'bloquear' | 'desbloquear' | 'activar' | 'desactiva
       listo: 'Negocio bloqueado',
     },
     desbloquear: { titulo: `¿Desbloquear ${n.nombre}?`, mensaje: 'El dueño podrá volver a registrar.', aceptar: 'Desbloquear', listo: 'Negocio desbloqueado' },
-    desactivar: {
-      titulo: `¿Desactivar la cuenta de ${n.dueno?.nombre}?`,
-      mensaje: 'No podrá entrar. Su información se guarda 6 meses y después se borra.',
-      aceptar: 'Desactivar',
-      listo: 'Cuenta desactivada',
-    },
-    activar: { titulo: `¿Activar la cuenta de ${n.dueno?.nombre}?`, mensaje: 'Podrá volver a entrar.', aceptar: 'Activar', listo: 'Cuenta activada' },
   }[accion]
   const confirmo = await dialogo.confirmar({
     titulo: textos.titulo,
     mensaje: textos.mensaje,
     aceptar: textos.aceptar,
     cancelar: 'Cancelar',
-    peligro: accion === 'bloquear' || accion === 'desactivar',
+    peligro: accion === 'bloquear',
   })
   if (!confirmo) return
   try {
@@ -81,33 +75,32 @@ async function hacer(accion: 'bloquear' | 'desbloquear' | 'activar' | 'desactiva
   }
 }
 
-// RF-46: el sistema crea la contraseña temporal; el admin se la dicta al dueño
-const temporal = ref<string | null>(null)
-async function restablecer() {
-  const n = negocio.value!
-  const confirmo = await dialogo.confirmar({
-    titulo: '¿Restablecer la contraseña?',
-    mensaje: `Se crea una contraseña temporal para ${n.dueno?.nombre}. Al entrar con ella, tendrá que crear una nueva. Sus otros dispositivos se cierran cuando se conecten.`,
-    aceptar: 'Restablecer',
-    cancelar: 'Cancelar',
-  })
-  if (!confirmo) return
-  try {
-    temporal.value = (await api.restablecer(n.id)).contrasena_temporal
-    await cargar()
-  } catch {
-    dialogo.avisar('No se pudo restablecer. Revise la conexión.')
-  }
+/*
+ * Cuentas del negocio: el dueño y las que se le agregaron (todas pueden lo mismo). Al tocar una se
+ * corrige, se le da una contraseña temporal (RF-46) o se desactiva. Solo el admin las crea.
+ */
+const cuentaAbierta = ref<CuentaUsuario | null>(null)
+const agregando = ref(false)
+const activas = computed(() => negocio.value?.usuarios.filter((c) => c.activo).length ?? 0)
+
+async function alCambiarCuenta(cuenta: CuentaUsuario) {
+  cuentaAbierta.value = cuenta
+  await cargar() // el estado del negocio depende de sus cuentas (desactivado si ninguna puede entrar)
 }
 
-// RF-05: corregir datos del negocio y del dueño
+async function alAgregar() {
+  agregando.value = false
+  await cargar()
+}
+
+// RF-05: corregir el nombre y el teléfono del negocio (los de cada persona se corrigen en su cuenta)
 const editando = ref(false)
-const datos = reactive({ nombre_negocio: '', nombre_dueno: '', telefono: '', usuario: '' })
+const datos = reactive({ nombre_negocio: '', telefono: '' })
 const erroresEdicion = ref<ErrorApi | null>(null)
 
 function abrirEdicion() {
   const n = negocio.value!
-  Object.assign(datos, { nombre_negocio: n.nombre, nombre_dueno: n.dueno?.nombre ?? '', telefono: n.telefono ?? '', usuario: n.dueno?.usuario ?? '' })
+  Object.assign(datos, { nombre_negocio: n.nombre, telefono: n.telefono ?? '' })
   erroresEdicion.value = null
   editando.value = true
 }
@@ -204,7 +197,7 @@ async function retirar() {
 
 <template>
   <div>
-    <BarraVolver :titulo="negocio?.nombre ?? 'Negocio'" :volver-a="{ name: 'admin' }" />
+    <BarraVolver :titulo="negocio?.nombre ?? 'Negocio'" :volver-a="{ name: 'admin-negocios' }" />
 
     <main class="pantalla">
       <p v-if="error" class="mensaje error" role="alert">
@@ -289,34 +282,38 @@ async function retirar() {
           <p class="suave pequeno">Los nombres y teléfonos de los deudores solo los ve el dueño.</p>
         </section>
 
-        <!-- RF-05 -->
+        <!-- RF-05: cada persona del negocio con su propia cuenta -->
         <section class="tarjeta">
           <div class="encabezado">
-            <h2>Dueño</h2>
-            <span class="etiqueta" :class="negocio.dueno?.activo ? 'cerrado' : 'no_abrio'">{{ negocio.dueno?.activo ? 'Activo' : 'Desactivado' }}</span>
+            <h2>Cuentas</h2>
+            <span class="etiqueta" :class="activas ? 'cerrado' : 'no_abrio'">
+              {{ activas === negocio.usuarios.length ? (activas === 1 ? 'Activa' : 'Todas activas') : `${activas} de ${negocio.usuarios.length} activas` }}
+            </span>
           </div>
+          <p class="suave pequeno">Cada persona entra con su propio usuario y puede hacer todo lo que hace el dueño. Toque una para corregirla, darle una contraseña temporal o desactivarla.</p>
+          <ul class="cuentas">
+            <FilaCuenta v-for="c in negocio.usuarios" :key="c.id" :cuenta="c" @abrir="cuentaAbierta = $event" />
+          </ul>
+          <button v-if="!negocio.datos_borrados_en" class="boton secundario" @click="agregando = true">
+            <IconUserPlus :size="22" aria-hidden="true" /> Agregar una cuenta
+          </button>
+        </section>
+
+        <!-- RF-05 / RF-11 / RF-12 -->
+        <section class="tarjeta">
+          <h2>Datos del negocio</h2>
           <dl class="ficha">
             <dt>Nombre</dt>
-            <dd>{{ negocio.dueno?.nombre }}</dd>
-            <dt>Usuario</dt>
-            <dd>{{ negocio.dueno?.usuario }}</dd>
+            <dd>{{ negocio.nombre }}</dd>
             <dt>Teléfono</dt>
             <dd>{{ negocio.telefono }}</dd>
           </dl>
-          <p v-if="negocio.dueno?.debe_cambiar_contrasena" class="mensaje aviso">
-            <IconKey :size="20" aria-hidden="true" /> Tiene una contraseña temporal sin cambiar.
-          </p>
           <div class="botones">
-            <button class="boton secundario" @click="abrirEdicion"><IconPencil :size="22" aria-hidden="true" /> Corregir datos</button>
-            <button class="boton secundario" @click="restablecer"><IconKey :size="22" aria-hidden="true" /> Restablecer contraseña</button>
+            <button class="boton secundario" @click="abrirEdicion"><IconPencil :size="22" aria-hidden="true" /> Corregir datos del negocio</button>
             <button v-if="negocio.estado === 'bloqueado'" class="boton secundario" @click="hacer('desbloquear')">
               <IconLockOpen :size="22" aria-hidden="true" /> Desbloquear negocio
             </button>
             <button v-else class="boton secundario peligro" @click="hacer('bloquear')"><IconLock :size="22" aria-hidden="true" /> Bloquear negocio</button>
-            <button v-if="negocio.dueno?.activo" class="boton secundario peligro" @click="hacer('desactivar')">
-              <IconUserOff :size="22" aria-hidden="true" /> Desactivar cuenta
-            </button>
-            <button v-else class="boton secundario" @click="hacer('activar')"><IconUserCheck :size="22" aria-hidden="true" /> Activar cuenta</button>
           </div>
         </section>
 
@@ -332,8 +329,8 @@ async function retirar() {
     <HojaInferior :abierta="retirando" titulo="Retirar negocio" @cerrar="retirando = false" @enviar="retirar">
       <p class="mensaje error">
         <IconAlertTriangle :size="20" aria-hidden="true" />
-        Se borran para siempre los cierres, pagos, fotos de comprobantes, fiados y deudores de {{ negocio?.nombre }}, y la cuenta de
-        {{ negocio?.dueno?.nombre }} queda desactivada. No se puede deshacer.
+        Se borran para siempre los cierres, pagos, fotos de comprobantes, fiados y deudores de {{ negocio?.nombre }}, y todas sus cuentas
+        quedan desactivadas. No se puede deshacer.
       </p>
       <p><strong>1.</strong> Antes, descargue su información en Excel para entregársela al dueño.</p>
       <button type="button" class="boton secundario" @click="descargarAntes"><IconDownload :size="22" aria-hidden="true" /> Descargar Excel</button>
@@ -352,19 +349,12 @@ async function retirar() {
 
     <RegistrarPagoSuscripcion :negocio="pagando ? negocio : null" @cerrar="pagando = false" @pagado="alPagar" />
 
-    <!-- RF-46: la contraseña temporal se muestra una sola vez -->
-    <HojaInferior :abierta="!!temporal" titulo="Contraseña temporal" @cerrar="temporal = null" @enviar="temporal = null">
-      <p>Díctele esta contraseña a {{ negocio?.dueno?.nombre }}. Al entrar, la app le pedirá crear una nueva.</p>
-      <p class="temporal monto">{{ temporal }}</p>
-      <p class="suave pequeno">No se vuelve a mostrar. Si se pierde, restablézcala otra vez.</p>
-      <template #acciones>
-        <button class="boton listo">Listo</button>
-      </template>
-    </HojaInferior>
+    <GestionCuenta :cuenta="cuentaAbierta" @cerrar="cuentaAbierta = null" @cambiada="alCambiarCuenta" />
+    <CrearCuenta :abierta="agregando" :negocio="negocio ? { id: negocio.id, nombre: negocio.nombre } : undefined" @cerrar="agregando = false" @creada="alAgregar" />
 
     <!-- RF-05 -->
-    <HojaInferior :abierta="editando" titulo="Corregir datos" @cerrar="editando = false" @enviar="guardarEdicion">
-      <label v-for="[clave, etiqueta] in [['nombre_negocio', 'Nombre del negocio'], ['nombre_dueno', 'Nombre del dueño'], ['telefono', 'Teléfono'], ['usuario', 'Usuario para entrar']] as const" :key="clave" class="campo">
+    <HojaInferior :abierta="editando" titulo="Corregir datos del negocio" @cerrar="editando = false" @enviar="guardarEdicion">
+      <label v-for="[clave, etiqueta] in [['nombre_negocio', 'Nombre del negocio'], ['telefono', 'Teléfono del negocio']] as const" :key="clave" class="campo">
         {{ etiqueta }}
         <span class="control"><input v-model="datos[clave]" autocomplete="off" :inputmode="clave === 'telefono' ? 'numeric' : undefined" /></span>
         <span v-if="erroresEdicion?.de(clave)" class="error">{{ erroresEdicion.de(clave) }}</span>
@@ -516,19 +506,10 @@ h3 {
   color: var(--error);
 }
 
-.temporal {
-  padding: 16px;
-  text-align: center;
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: var(--verde-900);
-  background: var(--verde-50);
-  border-radius: var(--radio-control);
-  user-select: all;
+.cuentas {
+  list-style: none;
+  margin: -6px 0 0;
+  padding: 0;
 }
 
-.listo {
-  grid-column: 1 / -1;
-}
 </style>

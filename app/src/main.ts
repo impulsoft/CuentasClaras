@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { Capacitor } from '@capacitor/core'
-import '@fontsource-variable/nunito' // va dentro de la app: funciona sin internet
+import '@fontsource-variable/inter' // va dentro de la app: funciona sin internet y en Android 7
 import './style.css'
 import App from './App.vue'
 import router from './router'

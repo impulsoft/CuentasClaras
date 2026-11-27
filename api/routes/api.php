@@ -20,6 +20,8 @@ Route::get('/estado', function () {
 });
 
 Route::post('/sesion', [SesionController::class, 'iniciar'])->middleware('throttle:10,1');
+// El admin que olvidó la contraseña entra con su código de recuperación
+Route::post('/recuperar', [ContrasenaController::class, 'recuperar'])->middleware('throttle:5,1');
 
 Route::middleware(['auth:sanctum', 'cuenta.activa', 'sesion.vigente'])->group(function () {
     Route::get('/yo', [SesionController::class, 'yo']);
@@ -62,5 +64,15 @@ Route::middleware(['auth:sanctum', 'cuenta.activa', 'sesion.vigente'])->group(fu
         Route::post('/negocios/{negocio}/contrasena', [Admin\NegocioController::class, 'restablecerContrasena']);
         Route::get('/negocios/{negocio}/mes', [Admin\NegocioController::class, 'mes']);
         Route::get('/negocios/{negocio}/excel', [ExcelController::class, 'exportarAdmin']);
+        Route::post('/negocios/{negocio}/cuentas', [Admin\UsuarioController::class, 'crearCuenta']);
+
+        // Usuarios: administradores y cuentas de los negocios
+        Route::get('/usuarios', [Admin\UsuarioController::class, 'index']);
+        Route::post('/administradores', [Admin\UsuarioController::class, 'crearAdmin']);
+        Route::put('/usuarios/{usuario}', [Admin\UsuarioController::class, 'update']);
+        Route::post('/usuarios/{usuario}/contrasena', [Admin\UsuarioController::class, 'restablecerContrasena']);
+        Route::post('/usuarios/{usuario}/desactivar', [Admin\UsuarioController::class, 'desactivar']);
+        Route::post('/usuarios/{usuario}/activar', [Admin\UsuarioController::class, 'activar']);
+        Route::post('/codigo-recuperacion', [ContrasenaController::class, 'crearCodigo']);
     });
 });

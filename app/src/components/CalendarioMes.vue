@@ -84,33 +84,48 @@ function descripcion(fecha: string): string {
 .fila {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 5px;
+  margin-bottom: 5px;
 }
 
 .letras span {
   text-align: center;
-  font-size: 0.75rem;
-  font-weight: 800;
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--texto-tenue);
 }
 
+/*
+ * Casilla limpia: blanca con borde fino, el número arriba y lo vendido (en miles) debajo.
+ * El estado va en una rayita de color abajo: verde = cerrado, naranja = falta, gris = no abrió.
+ */
 .dia {
   position: relative;
-  min-height: 64px;
-  padding: 6px 2px 4px;
+  min-height: 60px;
+  padding: 7px 2px 8px;
   font: inherit;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
+  overflow: hidden;
   color: var(--texto);
   background: var(--superficie);
-  border: 1.5px solid var(--linea);
-  border-radius: 14px;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
   cursor: pointer;
-  transition-property: transform, box-shadow;
+  transition-property: transform, box-shadow, border-color;
   transition-duration: 150ms;
+}
+
+.dia::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: transparent;
 }
 
 .dia:active:not(:disabled) {
@@ -118,28 +133,29 @@ function descripcion(fecha: string): string {
 }
 
 .numero {
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 0.95rem;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .monto {
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
+  color: var(--texto-suave);
   font-variant-numeric: tabular-nums;
 }
 
 .unidad {
   margin-top: -2px;
   font-size: 0.58rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
-  opacity: 0.8;
+  color: var(--texto-tenue);
 }
 
 .marca {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   line-height: 1;
 }
 
@@ -147,12 +163,12 @@ function descripcion(fecha: string): string {
 @media (max-width: 380px) {
   .fila {
     gap: 3px;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
 
   .dia {
     padding-inline: 1px;
-    border-radius: 11px;
+    border-radius: 8px;
   }
 
   .monto {
@@ -169,80 +185,90 @@ function descripcion(fecha: string): string {
   color: #b42318;
 }
 
-.cerrado {
-  background: var(--cerrado);
-  border-color: var(--cerrado-borde);
-  color: var(--cerrado-texto);
+.cerrado::after {
+  background: var(--verde-600);
 }
 
-.sin_cierre {
-  background: var(--sin-cierre);
-  border: 1.5px dashed var(--sin-cierre-borde);
-  color: var(--sin-cierre-texto);
+.cerrado .monto {
+  color: var(--texto);
+}
+
+.sin_cierre::after {
+  background: #ef9f27;
 }
 
 .no_abrio {
-  background: var(--no-abrio);
-  border-color: var(--no-abrio-borde);
+  background: var(--superficie-suave);
   color: var(--texto-suave);
+}
+
+.no_abrio::after {
+  background: var(--no-abrio-borde);
 }
 
 /* "No abrió" puede partirse en dos renglones si la columna es angosta */
 .no_abrio .monto {
   font-size: 0.6rem;
+  font-weight: 500;
   line-height: 1.1;
   text-align: center;
   white-space: normal;
 }
 
 .futuro {
-  color: #c2c8c4;
+  color: #c4cac7;
   background: transparent;
-  border-color: #eef0ee;
+  border-color: transparent;
   cursor: default;
 }
 
-/* Hoy: aro verde; día escogido: aro oscuro y un poco más grande */
+/* Hoy: borde verde; día escogido: aro oscuro */
 .hoy:not(.seleccionado) {
-  box-shadow: 0 0 0 2.5px var(--verde-600);
+  border-color: var(--verde-600);
+  box-shadow: 0 0 0 1px var(--verde-600);
+}
+
+.hoy .monto {
+  color: var(--verde-700);
 }
 
 .seleccionado {
-  box-shadow: 0 0 0 3px var(--texto), var(--sombra-2);
+  border-color: var(--texto);
+  box-shadow: 0 0 0 1.5px var(--texto);
 }
 
 .leyenda {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
-  margin-top: 12px;
+  margin-top: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--linea);
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.76rem;
+  font-weight: 500;
   color: var(--texto-suave);
 }
 
+/* Muestra de la leyenda: una rayita del color del estado */
 .muestra {
   display: inline-block;
   width: 14px;
-  height: 14px;
+  height: 4px;
   margin-right: 6px;
-  vertical-align: -2px;
-  border-radius: 4px;
-  border: 1.5px solid var(--no-abrio-borde);
+  vertical-align: 2px;
+  border-radius: 2px;
+  background: var(--no-abrio-borde);
 }
 
 .muestra.cerrado {
-  border-color: var(--cerrado-borde);
+  background: var(--verde-600);
 }
 
 .muestra.sin_cierre {
-  border: 1.5px dashed var(--sin-cierre-borde);
+  background: #ef9f27;
 }
 
 .muestra.futuro {
-  background: var(--superficie);
-  border-color: var(--linea);
+  background: var(--linea);
 }
 </style>

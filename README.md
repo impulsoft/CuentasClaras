@@ -75,6 +75,13 @@ El botón "atrás" del celular lo maneja `src/main.ts` con `@capacitor/app`: vue
 
 **Pagos por mes** (detalle de un negocio): una cuadrícula con los 12 meses del año, como el calendario del dueño pero por meses. Cada pago cuenta en el mes en que se pagó (igual que "Lo recaudado"): verde con el valor si pagó; "Al día" si no pagó ese mes pero un pago anterior lo cubría; rojo "Sin pagar" si ningún pago lo cubrió (en el mes actual, si ya venció); gris antes de ser cliente. Al tocar un mes se ven sus pagos con "Anular"; la lista completa de pagos queda plegada debajo. La lógica está en `mesesDePagos` (`src/admin.ts`).
 
+**Primer mes gratis** (registrar negocio): el admin decide en cada negocio si le deja el primer mes gratis con la casilla "El primer mes es gratis". Queda como un pago de $0 con la nota "Primer mes gratis": el vencimiento corre igual (un mes desde ese día), en la cuadrícula de pagos y en el historial se ve "Gratis", y no suma en lo recaudado ni cuenta como pago. El valor que se sugiere al cobrar es el del último pago que no fue gratis.
+
+**Usuarios y cuentas** (panel del admin → Usuarios): lista de los administradores y de todas las cuentas de los negocios. Al tocar una se corrige, se le da una contraseña temporal o se desactiva (la propia solo se corrige; su contraseña va en Cuenta, y nadie se desactiva a sí mismo).
+- **Varios administradores:** "Nuevo" crea otro admin con una contraseña temporal que cambia al entrar. Si uno olvida la contraseña, otro le da una temporal.
+- **Varias cuentas por negocio:** en el detalle del negocio, "Agregar una cuenta" crea otra persona (la esposa, un empleado) con su propio usuario; puede lo mismo que el dueño y acepta los términos al entrar. Solo el admin las crea. El negocio queda "desactivado" solo si ninguna de sus cuentas puede entrar; retirarlo desactiva todas. `dueno` en la API es la cuenta principal (la primera).
+- **Código de recuperación del admin:** en Cuenta → "Crear mi código" se muestra una sola vez un código como `K7M2-9QXP-4HTR` (se guarda cifrado). Si olvida la contraseña, en la pantalla de entrar toca la rueda de ajustes (arriba a la derecha, discreta a propósito) y pone una nueva con el código; el código sirve una vez y se cierran sus sesiones. Contra intentos de adivinarlo: 5 por minuto por equipo y, por usuario, después de 10 fallidos se bloquea una hora aunque prueben desde equipos distintos. El código solo se crea con la sesión abierta, así que el panel muestra un aviso "Cree su código de recuperación" hasta que lo cree. Los dueños no tienen código: a ellos se les da una temporal. Como último recurso queda `php artisan cierre:admin --restablecer` en el servidor.
+
 "Tomar foto" abre la app de cámara del celular y la foto vuelve a la app; no hace falta el permiso de cámara en el `AndroidManifest.xml` (si se agrega y el dueño no lo acepta, Android bloquea la cámara).
 
 La APK de prueba se probó en un emulador con Android 7.0 (WebView Chrome 69, sin actualizar): entrar, sincronizar, calendario, cierre, gráficas, "Tomar foto", "Subir pantallazo", descartar la foto, descargar el Excel, nuevo fiado y abono. Para revisar la pantalla del WebView desde el PC: `adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>` y abrir `chrome://inspect`.
@@ -92,6 +99,12 @@ El script pide la contraseña (no se ve al escribirla) y crea `C:\Users\<usuario
 - **No se puede perder.** Android solo instala una actualización si viene firmada con la misma llave; sin ella, los dueños tendrían que borrar la app e instalarla de nuevo, y perderían lo que no se haya sincronizado. Guarde una copia de la carpeta y la contraseña fuera del PC (memoria USB guardada y gestor de contraseñas).
 - Sin la llave, `gradlew assembleRelease` se detiene con un mensaje que explica cómo crearla.
 - En cada versión nueva para los dueños, suba `versionCode` (y `versionName`) en `app/android/app/build.gradle`; Android no instala una versión con un número igual o menor.
+
+**Servidor de producción:** la API está en `https://api.impulsoft.online` (`app/.env.production`) y la página web en `https://cuentasclaras.impulsoft.online`. El identificador de la app en Android es `online.impulsoft.cuentasclaras`: no se cambia nunca, porque Android tomaría la app como otra distinta y los dueños tendrían que borrarla e instalarla de nuevo.
+
+**Certificado del servidor en Android 7.0:** el servidor usa Let's Encrypt, cuya raíz (ISRG Root X1) no viene en Android 7.0 (llegó en 7.1.1); sin arreglo, en esos celulares la app no se conecta y dice que no hay internet. Por eso la app lleva esa raíz pública en `android/app/src/main/res/raw/isrg_root_x1.pem` y la suma a las del celular en `res/xml/network_security_config.xml` (la de prueba, en `src/debug/`, además permite http). Se probó en el emulador con Android 7.0 contra el servidor real. Si algún día el servidor cambia a un certificado de otra entidad, revisar que su raíz también esté.
+
+La APK de prueba y la de los dueños tienen el mismo identificador pero distinta firma: Android no deja instalar una encima de la otra (hay que desinstalar). A los dueños solo se les entrega la de `release`.
 
 Pasos para la APK de los dueños (desde `app`, con `app/.env.production` creado):
 
@@ -136,6 +149,13 @@ php artisan serve
 | `POST /api/excel/leer` | Dueño con términos aceptados | Lee el Excel (campo `archivo`) y devuelve cada fila con sus errores, sin guardar nada (RF-27, RF-29, RN-08) |
 | `POST /api/cuaderno` | Dueño con términos aceptados | Lee la foto de una página del cuaderno (campo `foto`) y devuelve los días con su total; la foto no se guarda (RF-28, RN-43) |
 | `GET /api/admin/resumen` | Admin | Negocios al día, por vencer y vencidos, y lo recaudado en el mes (RF-13) |
+| `POST /api/recuperar` | No | El admin pone una contraseña nueva con su `codigo` de recuperación (5 intentos por minuto) |
+| `POST /api/admin/codigo-recuperacion` | Admin | Crea el código de recuperación del admin (se muestra una sola vez) |
+| `GET /api/admin/usuarios` | Admin | Administradores y cuentas de los negocios, con su estado y última conexión |
+| `POST /api/admin/administradores` | Admin | Crear otro administrador (devuelve su contraseña temporal) |
+| `POST /api/admin/negocios/{id}/cuentas` | Admin | Agregar otra cuenta a un negocio (puede lo mismo que el dueño; devuelve la temporal) |
+| `PUT /api/admin/usuarios/{id}` | Admin | Corregir nombre, usuario y teléfono de una cuenta |
+| `POST /api/admin/usuarios/{id}/contrasena` · `/desactivar` · `/activar` | Admin | Contraseña temporal, desactivar o activar una cuenta (no la propia) |
 | `GET /api/admin/recaudo?meses=12` | Admin | Lo recaudado mes a mes (sin anulados), del más viejo al actual, con los meses sin pagos en 0 |
 | `GET /api/admin/recaudo/excel?desde=&hasta=` | Admin | Excel de los pagos de la suscripción de todos los negocios |
 | `GET /api/admin/negocios` | Admin | Lista de negocios con su suscripción y lo que les deben, sin nombres de deudores (RF-06, RF-08, RF-44) |
@@ -193,8 +213,6 @@ Se monta en un VPS con Dokploy usando [`docker-compose.yml`](docker-compose.yml)
 
 - Guardar una copia de la llave de firma (`C:\Users\<usuario>\LlaveCierreDeCaja\`) y su contraseña fuera del PC.
 - Montar el servidor ([`despliegue/README.md`](despliegue/README.md)): VPS de 4 GB, dominio con `api` y `app`, repositorio privado en GitHub y un espacio S3 para las copias. Las imágenes de Docker no se pudieron construir en este PC (falta WSL); la primera construcción real será en Dokploy. Sí se verificó cada paso por separado: las imágenes base existen y están al día, el OCR tiene sus paquetes para Python 3.12 en Linux (sin librerías gráficas), la API se instala solo con dependencias de producción y arranca en modo producción (migraciones, cachés, admin, `/up`, CORS y tareas de cada noche), y `npm ci` de la página web está al día.
-- Crear `app/.env.production` con la dirección https de la API real para poder generar la APK de los dueños.
-- Cambiar el identificador de la app (`co.cierredecaja.app` en `app/capacitor.config.ts`) si se va a publicar con otro dominio.
 - Instalar la APK en un celular real con Android 7 (y en uno nuevo) antes de entregarla: en el emulador funciona, pero la cámara y "Compartir" dependen de las apps que traiga cada celular.
 - Probar RapidOCR con fotos tomadas con la cámara a otro celular y con páginas reales del cuaderno escritas a mano (sección 7.1 del documento). Los pantallazos de Nequi ya se leen bien; el cuaderno se probó solo con letra manuscrita simulada.
 - Texto del aviso de privacidad para deudores (`app/src/components/AvisoPrivacidad.vue`): es provisional hasta que lo revise un abogado.

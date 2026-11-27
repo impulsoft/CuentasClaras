@@ -5,7 +5,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const pruebaLocal = process.env.CIERRE_API_LOCAL === '1';
 
 const config: CapacitorConfig = {
-  appId: 'co.cierredecaja.app',
+  appId: 'online.impulsoft.cuentasclaras',
   appName: 'Cierre de Caja',
   webDir: 'dist',
   android: {

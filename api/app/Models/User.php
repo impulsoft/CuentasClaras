@@ -12,8 +12,8 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['negocio_id', 'rol', 'nombre', 'usuario', 'telefono', 'password', 'activo', 'desactivado_en', 'debe_cambiar_contrasena', 'sesiones_validas_desde', 'terminos_aceptados_en'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['negocio_id', 'rol', 'nombre', 'usuario', 'telefono', 'password', 'activo', 'desactivado_en', 'debe_cambiar_contrasena', 'sesiones_validas_desde', 'terminos_aceptados_en', 'codigo_recuperacion', 'codigo_recuperacion_en'])]
+#[Hidden(['password', 'remember_token', 'codigo_recuperacion'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -37,6 +37,8 @@ class User extends Authenticatable
             'terminos_aceptados_en' => 'datetime',
             'desactivado_en' => 'datetime',
             'sesiones_validas_desde' => 'datetime',
+            'codigo_recuperacion' => 'hashed',
+            'codigo_recuperacion_en' => 'datetime',
         ];
     }
 
@@ -47,6 +49,36 @@ class User extends Authenticatable
     public function sesionVencida(?Carbon $creadaEl): bool
     {
         return $this->sesiones_validas_desde !== null && $creadaEl !== null && $creadaEl->lessThan($this->sesiones_validas_desde);
+    }
+
+    // No puede entrar y se cierran sus sesiones en todos los equipos (RF-05, RN-16)
+    public function desactivar(): void
+    {
+        $this->update(['activo' => false, 'desactivado_en' => now()]);
+        $this->tokens()->delete();
+    }
+
+    /**
+     * Código de recuperación del admin: si olvida la contraseña, entra con este código y pone una
+     * nueva, sin terminal. Se muestra una sola vez; se guarda cifrado, como una contraseña.
+     * 12 letras y números sin los que se confunden (0/O, 1/I/L), en tres grupos: K7M2-9QXP-4HTR.
+     */
+    public function crearCodigoRecuperacion(): string
+    {
+        $letras = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        $codigo = '';
+        for ($i = 0; $i < 12; $i++) {
+            $codigo .= $letras[random_int(0, strlen($letras) - 1)];
+        }
+        $this->update(['codigo_recuperacion' => $codigo, 'codigo_recuperacion_en' => now()]);
+
+        return implode('-', str_split($codigo, 4));
+    }
+
+    // Lo que escribe la persona: sin guiones ni espacios y en mayúsculas ("k7m2 9qxp-4htr" sirve)
+    public static function normalizarCodigo(string $codigo): string
+    {
+        return strtoupper(preg_replace('/[^a-z0-9]/i', '', $codigo));
     }
 
     public function negocio(): BelongsTo

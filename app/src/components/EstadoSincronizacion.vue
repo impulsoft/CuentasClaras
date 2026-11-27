@@ -37,17 +37,21 @@ const puedeReintentar = computed(() => sync.estado !== 'sincronizando' && (sync.
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 2px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--verde-50);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+
+.estado svg {
+  color: var(--verde-600);
 }
 
 .reintentar {
   font: inherit;
-  font-weight: 800;
-  color: #ffffff;
+  font-weight: 600;
+  color: var(--verde-700);
   padding: 2px 10px;
-  border: 1.5px solid rgb(255 255 255 / 0.5);
+  border: 1px solid var(--verde-200);
   border-radius: var(--radio-pildora);
   background: none;
   cursor: pointer;

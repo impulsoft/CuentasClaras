@@ -203,7 +203,7 @@ const filas = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 1.15rem;
 }
 

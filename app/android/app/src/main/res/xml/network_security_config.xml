@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  APK de los dueños: solo https.
+  El servidor usa un certificado de Let's Encrypt, cuya raíz (ISRG Root X1) no viene en Android 7.0
+  (llegó en 7.1.1). Sin esto, en esos celulares la app no puede conectarse y dice que no hay internet.
+  La raíz va dentro de la app (res/raw/isrg_root_x1.pem, es pública) y se suma a las del celular.
+  La APK de prueba usa src/debug/res/xml/network_security_config.xml, que además permite http.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
